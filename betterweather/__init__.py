@@ -1,0 +1,1 @@
+from .betterweather import app
