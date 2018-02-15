@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+
 def create_db_connection(config):
     """
 
@@ -17,7 +18,7 @@ def create_db_connection(config):
 
     uri += '/' + config.get('NAME')
     engine = create_engine(uri)
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine, autocommit=True)
     session = Session()
 
     return session

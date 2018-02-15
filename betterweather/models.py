@@ -22,6 +22,7 @@ class ForecastData(Base):
     tt = Column(Float, comment='dry bulb temperature at 2m above ground in degrees C')
     td = Column(Float, comment='dew point temperature at 2m above ground in degrees C')
     tx = Column(Float, comment='maximum of temperature for previous day in degrees C')
+    tn = Column(Float, comment='minimum of temperature for previous day in degrees C')
     tm = Column(Float, comment='daily mean of temperature previous day in degrees C')
     tg = Column(Float, comment='minimum temperature at 5cm above ground last 12h in degrees C')
     dd = Column(Integer, comment='mean wind direction during last 10 min at 10m above ground')
