@@ -51,7 +51,7 @@ class ForecastData(Base):
     pppp = Column(Float, comment='pressure reduced to mean sea level in hPa')
     ss1 = Column(Float, comment='total time of sunshine during last hour in Stunden')
     ss24 = Column(Float, comment='total time of sunshine during past day in Stunden')
-    gss1 = Column(Integer, comment='global radiation last hour in kJ/qm')
+    gss1 = Column(Float, comment='global radiation last hour in kJ/qm')
     station_id = Column(String(5), ForeignKey('weather_stations.id'))
 
     station = relationship("WeatherStation", back_populates="forecast_data")

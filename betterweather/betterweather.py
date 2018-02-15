@@ -1,4 +1,4 @@
-import click, re, csv
+import click, re, csv, os
 from flask import Flask, g
 from datetime import date, time, datetime
 from urllib import request, error
@@ -71,23 +71,27 @@ def import_staions(path_to_file):
 
 
 @app.cli.command('get_forecast_data')
-def update_forecast():
+@click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
+def update_forecast(verbose):
     """Get weather forecast from online service"""
     try:
-        print('Retrieving forecast data from ' + app.config['FORECASTS_URL'])
+        if verbose:
+            print('Retrieving forecast data from ' + app.config['FORECASTS_URL'])
         root = request.urlopen(app.config['FORECASTS_URL'])
         links = re.findall(r"(?:href=['\"])([:/.A-z?<_&\s=>0-9;-]+)", root.read().decode('utf-8'))
-        total_items = links.__sizeof__()
+        total_items = len(links)
         db = get_db()
         for link in links:
             station_id = link.__str__()[:5].replace("_", "")
             current_item = links.index(link)
-            print("Processing station " + current_item.__str__() + ' of ' + total_items.__str__() + ': '+ station_id)
+            if verbose:
+                print("Processing station " + current_item.__str__() + ' of ' + total_items.__str__() + ': '+ station_id)
             url = app.config['FORECASTS_URL'] + link
             try:
                 file = request.urlretrieve(url)
             except error.ContentTooShortError as err_content_to_short:
-                print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
+                if verbose:
+                    print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
                 continue
 
             with open(file[0], 'r') as forecast_for_station:
@@ -95,11 +99,13 @@ def update_forecast():
                 try:
                     db.begin(subtransactions=True)
                     for row in csv_reader:
+                        for i in range(0, len(row)):
+                            row[i] = row[i].replace(',', '.').replace(' ', '')
                         try:
                             dt_object = datetime.strptime(row[0], '%d.%m.%y')
                             forecast_data = models.ForecastData(
                                 date=dt_object.date(),
-                                time=datetime.strptime(row[1], '%H:%M'),
+                                time=datetime.strptime(row[1], '%H:%M').time(),
                                 tt=float(row[2]) if row[2] != "---" else None,
                                 td=float(row[3]) if row[3] != "---" else None,
                                 tx=float(row[4]) if row[4] != "---" else None,
@@ -122,28 +128,31 @@ def update_forecast():
                                 rrp24=int(row[21]) if row[21] != "---" else None,
                                 ev=float(row[22]) if row[22] != "---" else None,
                                 ww=int(row[23]) if row[23] != "---" else None,
-                                w=float(row[24]) if row[24] != "---" else None,
+                                w=int(row[24]) if row[24] != "---" else None,
                                 vv=float(row[25]) if row[25] != "---" else None,
-                                n=float(row[26]) if row[26] != "---" else None,
-                                nf=float(row[27]) if row[27] != "---" else None,
-                                nl=float(row[28]) if row[28] != "---" else None,
+                                n=int(row[26]) if row[26] != "---" else None,
+                                nf=int(row[27]) if row[27] != "---" else None,
+                                nl=int(row[28]) if row[28] != "---" else None,
                                 nm=int(row[29]) if row[29] != "---" else None,
                                 nh=int(row[30]) if row[30] != "---" else None,
-                                pppp=int(row[31]) if row[31] != "---" else None,
+                                pppp=float(row[31]) if row[31] != "---" else None,
                                 ss1=float(row[32]) if row[32] != "---" else None,
                                 ss24=float(row[33]) if row[33] != "---" else None,
-                                gss1=int(row[34]) if row[34] != "---" else None,
+                                gss1=float(row[34]) if row[34] != "---" else None,
                                 station_id=station_id
                             )
                             db.add(forecast_data)
-                            print('.', end='')
-                        except ValueError:
+                            if verbose:
+                                print('.', end='')
+                        except ValueError as err_value:
                             continue
                     db.commit()
-                    print('\nProcessing data for station ' + station_id + ' finished.')
+                    if verbose:
+                        print('\nProcessing data for station ' + station_id + ' finished.')
                 except exc.DBAPIError as err_dbapi:
                     db.rollback()
                     print('\nError while processing data for station ' + station_id + ': ' + err_dbapi.__str__())
+            os.remove(file[0])
         print("Forecast data successfully retrieved.")
     except error.HTTPError as err_http:
         print('Error while retrieving forecast data: ' + err_http.__str__())
