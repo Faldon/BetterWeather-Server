@@ -1,7 +1,7 @@
 import re
 from sqlalchemy.orm.session import Session
 from sqlalchemy import exc
-DB_VERSION = 2
+DB_VERSION = 1
 
 
 def get_version():
@@ -67,11 +67,7 @@ def schema_update(db, force=False, verbose=False):
     queries = []
     try:
         for i in range(version, DB_VERSION):
-            if i == 1:
-                queries.append({
-                    'sql': 'ALTER TABLE forecast_data ADD tn FLOAT;',
-                    'params': None
-                })
+            pass
         queries.append({
             'sql': 'UPDATE db_information SET version=:version',
             'params': {'version': DB_VERSION}

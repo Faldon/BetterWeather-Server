@@ -55,6 +55,7 @@ class ForecastData(Base):
     station_id = Column(String(5), ForeignKey('weather_stations.id'))
 
     station = relationship("WeatherStation", back_populates="forecast_data")
+    __table_args__ = (UniqueConstraint('station_id', 'date', 'time', name='uq_forecast_data.station_id_date_time'),)
 
 
 WeatherStation.forecast_data = relationship("ForecastData", order_by=ForecastData.id, back_populates="station")

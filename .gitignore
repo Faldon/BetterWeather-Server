@@ -18,6 +18,8 @@ __pycache__
 .idea/**/sqlDataSources.xml
 .idea/**/dynamic.xml
 .idea/**/uiDesigner.xml
+.idea/**/BetterWeatherServer.iml
+.idea/**/misc.xml
 
 # Gradle:
 .idea/**/gradle.xml

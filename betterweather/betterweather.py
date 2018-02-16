@@ -141,6 +141,11 @@ def update_forecast(verbose):
                                 gss1=float(row[34]) if row[34] != "---" else None,
                                 station_id=station_id
                             )
+                            db.query(models.ForecastData).filter(
+                                models.ForecastData.station_id == forecast_data.station_id,
+                                models.ForecastData.date == forecast_data.date,
+                                models.ForecastData.time == forecast_data.time
+                            ).delete()
                             db.add(forecast_data)
                             if verbose:
                                 print('.', end='')
