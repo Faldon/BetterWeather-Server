@@ -1,11 +1,12 @@
-import click, re, csv, os
+import click, re, csv, os, time
 from flask import Flask, g
-from datetime import date, time, datetime
+from datetime import datetime
 from urllib import request, error
-from sqlalchemy import exc, MetaData
-from sqlalchemy.schema import CreateTable, Table
-from betterweather.db import schema, create_db_connection
+from sqlalchemy import exc
+from sqlalchemy.schema import CreateTable
+from betterweather.db import schema, create_db_connection, get_db_engine
 from betterweather import stations, models
+
 
 app = Flask(__name__)
 app.config.from_object('betterweather.settings')
@@ -15,7 +16,9 @@ if __name__ == "__main__":
 
 
 def connect_db():
-    session = create_db_connection(app.config['DATABASE'])
+    if not hasattr(g, 'db_engine'):
+        g.db_engine = get_db_engine(app.config['DATABASE'])
+    session = create_db_connection(g.db_engine)
     return session
 
 
@@ -25,9 +28,7 @@ def init_db():
 
 
 def get_db():
-    if not hasattr(g, 'db_session'):
-        g.db_session = connect_db()
-    return g.db_session
+    return connect_db()
 
 
 @app.teardown_appcontext
@@ -41,7 +42,6 @@ def close_db(err):
 @click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
 def schema_create_command(force, verbose):
     """Initializes the database"""
-    print('Creating database schema from model data skipping tables already present.')
     db = get_db()
     success = schema.schema_create(db, force, verbose)
     if success and force:
@@ -58,7 +58,6 @@ def schema_create_command(force, verbose):
 @click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
 def schema_update_command(force, verbose):
     """Migrates the database"""
-    print('Migrating the database to version ' + schema.DB_VERSION.__str__())
     if not schema.schema_update(get_db(), force, verbose):
         print('An error occured during migration operation.')
 
@@ -79,13 +78,13 @@ def update_forecast(verbose):
             print('Retrieving forecast data from ' + app.config['FORECASTS_URL'])
         root = request.urlopen(app.config['FORECASTS_URL'])
         links = re.findall(r"(?:href=['\"])([:/.A-z?<_&\s=>0-9;-]+)", root.read().decode('utf-8'))
-        total_items = len(links)
         db = get_db()
+        db.begin(subtransactions=True)
+        start = datetime.now()
         for link in links:
             station_id = link.__str__()[:5].replace("_", "")
-            current_item = links.index(link)
             if verbose:
-                print("Processing station " + current_item.__str__() + ' of ' + total_items.__str__() + ': '+ station_id)
+                print("Processing station " + station_id)
             url = app.config['FORECASTS_URL'] + link
             try:
                 file = request.urlretrieve(url)
@@ -93,11 +92,9 @@ def update_forecast(verbose):
                 if verbose:
                     print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
                 continue
-
             with open(file[0], 'r') as forecast_for_station:
                 csv_reader = csv.reader(forecast_for_station, delimiter=";")
                 try:
-                    db.begin(subtransactions=True)
                     for row in csv_reader:
                         for i in range(0, len(row)):
                             row[i] = row[i].replace(',', '.').replace(' ', '')
@@ -151,15 +148,20 @@ def update_forecast(verbose):
                                 print('.', end='')
                         except ValueError as err_value:
                             continue
-                    db.commit()
                     if verbose:
                         print('\nProcessing data for station ' + station_id + ' finished.')
                 except exc.DBAPIError as err_dbapi:
-                    db.rollback()
                     print('\nError while processing data for station ' + station_id + ': ' + err_dbapi.__str__())
             os.remove(file[0])
+        db.commit()
+        end = datetime.now()
+        print(end-start)
         print("Forecast data successfully retrieved.")
     except error.HTTPError as err_http:
         print('Error while retrieving forecast data: ' + err_http.__str__())
     except IOError as err_io:
         print('Error while retrieving forecast data: ' + err_io.__str__())
+    except exc.DBAPIError as err_dbapi:
+        db.rollback()
+        print('\nError while processing data for station ' + station_id + ': ' + err_dbapi.__str__())
+
