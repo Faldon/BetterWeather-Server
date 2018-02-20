@@ -19,38 +19,53 @@ def schema_create(db, force=False, verbose=False):
     queries = [
         {
             'sql': """CREATE TABLE db_information (
+    name CHAR(13) NOT NULL PRIMARY KEY,
     version INT NOT NULL
 );""",
             'params': None
         },
         {
             'sql': """INSERT INTO db_information VALUES (
+    :name,
     :version
 );""",
-            'params': {'version': DB_VERSION}
+            'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
         },
     ]
 
+    success = True
     try:
         db.begin(subtransactions=True)
         if verbose:
             __print_raw_sql(queries)
         for query in queries:
-            db.execute(query['sql'], query['params'])
-        if force:
+            try:
+                db.begin(subtransactions=True)
+                db.execute(query['sql'], query['params'])
+                if force:
+                    db.commit()
+                else:
+                    db.rollback()
+            except exc.OperationalError as err_operational:
+                if re.search(r'table db_information already exists', err_operational.__str__()):
+                    continue
+                else:
+                    db.rollback()
+                    success = success and False
+            except exc.IntegrityError as err_integrity:
+                if re.search(r'UNIQUE constraint failed: db_information.name', err_integrity.__str__()):
+                    continue
+                else:
+                    db.rollback()
+                    success = success and False
+        if success and force:
             db.commit()
-        else:
-            db.rollback()
-        return True
-    except exc.OperationalError as err_operational:
-        if re.search("already exists", err_operational.__str__()):
-            return True
-        else:
-            raise err_operational
+        return success
     except exc.DBAPIError as err_dbapi:
         print(err_dbapi)
         db.rollback()
-        return False
+        success = success and False
+        return success
 
 
 def schema_update(db, force=False, verbose=False):
@@ -98,5 +113,12 @@ def __print_raw_sql(queries):
         params = query['params']
         if params:
             for key in params:
-                sql = sql.replace(':' + key, params[key].__str__())
+                sql = sql.replace(':' + key, __quote(params[key]))
         print(sql)
+
+
+def __quote(value):
+    if type(value) is str:
+        return "'" + value + "'"
+    return value.__str__()
+
