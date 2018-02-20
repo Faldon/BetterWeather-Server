@@ -7,4 +7,5 @@ DATABASE = dict(
     NAME='tests/testdata/test.db'
 )
 
-FORECASTS_URL = 'https://opendata.dwd.de/weather/local_forecasts/poi/'
+FORECASTS_URL_CSV = 'https://opendata.dwd.de/weather/local_forecasts/poi/'
+FORECASTS_URL_ASCII = 'https://opendata.dwd.de/weather/local_forecasts/mos/'
