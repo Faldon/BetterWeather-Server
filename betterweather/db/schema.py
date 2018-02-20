@@ -84,8 +84,10 @@ def schema_update(db, force=False, verbose=False):
         for i in range(version, DB_VERSION):
             pass
         queries.append({
-            'sql': 'UPDATE db_information SET version=:version',
-            'params': {'version': DB_VERSION}
+            'sql': """UPDATE db_information 
+    SET version=:version
+    WHERE name=:name""",
+            'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
         })
         if verbose:
             __print_raw_sql(queries)
