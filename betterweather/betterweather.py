@@ -50,7 +50,7 @@ def schema_create_command(force, verbose):
         for table in models.Base.metadata.tables:
             print(CreateTable(models.Base.metadata.tables.get(table), bind=db.get_bind()))
     if not success:
-        print('An error occured. No changes were made to he database.')
+        print('An error occured. No changes were made to the database.')
 
 
 @app.cli.command('schema_update')
