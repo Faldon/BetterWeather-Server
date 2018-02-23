@@ -66,7 +66,7 @@ def schema_update_command(force, verbose):
 @click.argument("path_to_file")
 def import_staions(path_to_file):
     """Import weather station data from csv"""
-    stations.import_from_csv(path_to_file, get_db())
+    stations.import_stations_from_csv(path_to_file, get_db())
 
 
 @app.cli.command('get_forecast_data')

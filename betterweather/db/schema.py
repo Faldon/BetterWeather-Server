@@ -35,6 +35,7 @@ def schema_create(db, force=False, verbose=False):
             'sql': """CREATE TABLE weather_codes (
     id INT NOT NULL PRIMARY KEY,
     precipitation BOOLEAN NOT NULL,
+    key_group_outline VARCHAR(255) NOT NULL,
     weather_outline VARCHAR(255) NOT NULL,
     weather_detail_1 VARCHAR(255) DEFAULT NULL,
     weather_detail_2 VARCHAR(255) DEFAULT NULL

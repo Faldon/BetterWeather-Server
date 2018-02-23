@@ -5,7 +5,19 @@ from datetime import datetime
 from betterweather.models import *
 
 
-def import_from_csv(path_to_file, db):
+def import_stations_from_sql(path_to_file, db):
+    db.begin(subtransactions=True)
+    try:
+        for query in open(path_to_file, 'r'):
+            db.execute(query)
+        db.commit()
+        return True
+    except exc.DBAPIError:
+        db.rollback()
+        return False
+
+
+def import_stations_from_csv(path_to_file, db):
     """
     Import station data from csv
     :param str path_to_file: The csv file

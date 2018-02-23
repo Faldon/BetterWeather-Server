@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import exc
 
 
 def get_db_engine(config):
@@ -28,3 +29,19 @@ def create_db_connection(engine):
     Session = sessionmaker(bind=engine, autocommit=True)
     session = Session()
     return session
+
+
+def import_weathercodes_from_csv(path_to_file, db):
+    pass
+
+
+def import_weathercodes_from_sql(path_to_file, db):
+    db.begin(subtransactions=True)
+    try:
+        for query in open(path_to_file, 'r'):
+            db.execute(query)
+        db.commit()
+        return True
+    except exc.DBAPIError:
+        db.rollback()
+        return False
