@@ -1,8 +1,14 @@
-import csv, re, os, bz2, io
+import csv
+import re
+import os
+import bz2
 from sqlalchemy import exc
 from urllib import request, error
 from datetime import datetime
+from math import sin, cos, sqrt, atan2, radians
 from betterweather.models import *
+
+R = 6373.0
 
 
 def import_stations_from_sql(path_to_file, db):
@@ -86,6 +92,7 @@ def update_mosmix_poi(root_url, db, verbose):
     :param bool verbose: Print verbose output
     :return:
     """
+    station_id = ''
     try:
         if verbose:
             print('Retrieving forecast data from ' + root_url)
@@ -228,7 +235,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
                                     tn=float(row[cf + 6]) if not re.match(r'(-{3}|/{3}|$)', row[cf + 6]) else None,
                                     dd=int(row[cf + 7]) if not re.match(r'(-{2}|/{2}|$)', row[cf + 7]) else None,
                                     ff=float(row[cf + 8]) * 1.852 if not re.match(r'(-{2}|/{2}|$)', row[cf + 8]) else None,
-                                    fx=float(row[cf + 9])  * 1.852 if not re.match(r'(-{2}|/{2}|$)', row[cf + 9]) else None,
+                                    fx=float(row[cf + 9]) * 1.852 if not re.match(r'(-{2}|/{2}|$)', row[cf + 9]) else None,
                                     ww=int(row[cf + 12]) if not re.match(r'(-{2}|/{2}|$)', row[cf + 12]) else None,
                                     w=int(row[cf + 13]) if not re.match(r'([-/])', row[cf + 13]) else None,
                                     n=int(row[cf + 14]) if not re.match(r'([-/])', row[cf + 14]) else None,
@@ -277,7 +284,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
         return True
     except exc.DBAPIError as err_dbapi:
         db.rollback()
-        print('\nDB Error while processing file ' + match.string + ': ' + err_dbapi.__str__())
+        print('\nDB Error: ' + err_dbapi.__str__())
         return False
     except error.HTTPError as err_http:
         print('HTTP Error while retrieving forecast data: ' + err_http.__str__())
@@ -285,3 +292,34 @@ def update_mosmix_o_underline(root_url, db, verbose):
     except IOError as err_io:
         print('IO Error while retrieving forecast data: ' + err_io.__str__())
         return False
+
+
+def get_nearest_station(db, latitude, longitude):
+    src = dict(latitude=latitude, longitude=longitude)
+    q = db.query(WeatherStation)
+    distances = []
+    for weather_station in q.all()[:]:
+        dst = dict(latitude=weather_station.latitude, longitude=weather_station.longitude)
+        distance = __get_distance(src, dst)
+        distances.append(dict(station=weather_station, distance=distance))
+    return sorted(distances, key=lambda k: k['distance'])[0]['station']
+
+
+def __get_distance(src, dst):
+    """
+    Calculate the distance between two points
+    :param Dict src: The source point
+    :param Dict dst: The destination point
+    :return: float The distance in kilometers
+    """
+    src_latitude = radians(float(src['latitude']))
+    src_longitude = radians(float(src['longitude']))
+    dst_latitude = radians(dst['latitude'])
+    dst_longitude = radians(dst['longitude'])
+
+    dlon = dst_longitude - src_longitude
+    dlat = dst_latitude - src_latitude
+    a = (sin(dlat/2))**2 + cos(src_latitude) * cos(dst_latitude) * (sin(dlon/2))**2
+    c = 2 * atan2(sqrt(a), sqrt((1-a)))
+    distance = R * c
+    return distance

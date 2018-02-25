@@ -1,8 +1,7 @@
-import click, re, csv, os, time
-from flask import Flask, g
+import click
+import json
+from flask import Flask, g, jsonify
 from datetime import datetime
-from urllib import request, error
-from sqlalchemy import exc
 from sqlalchemy.schema import CreateTable
 from betterweather.db import schema, create_db_connection, get_db_engine
 from betterweather import stations, models
@@ -84,3 +83,51 @@ def update_forecast(file_format, verbose):
         return stations.update_mosmix_o_underline(app.config['FORECASTS_URL_ASCII'], get_db(), verbose)
     if file_format == 'kml':
         return stations.update_mosmix_o_underline(app.config['FORECASTS_URL_KML'], get_db(), verbose)
+
+
+@app.cli.command('print_current_station_forecast')
+@click.argument('station_id')
+def print_current_station_forecast(station_id):
+    t = datetime.now().timestamp()
+    forecast = __get_forecast(station_id, t)
+    print(forecast.id)
+
+
+@app.route('/forecast/station/<station_id>/now')
+def get_current_station_forecast(station_id):
+    t = datetime.now().timestamp()
+    return get_station_forecast(station_id, t)
+
+
+@app.route('/forecast/location/<latitude>/<longitude>/now')
+def get_current_location_forecast(latitude, longitude):
+    t = datetime.now().timestamp()
+    return get_location_forecast(latitude, longitude, t)
+
+
+@app.route('/forecast/station/<station_id>/<timestamp>')
+def get_station_forecast(station_id, timestamp):
+    forecast = __get_forecast(station_id, timestamp)
+
+
+@app.route('/forecast/location/<latitude>/<longitude>/timestamp')
+def get_location_forecast(latitude, longitude, timestamp):
+    station = stations.get_nearest_station(get_db(), latitude, longitude)
+    return get_station_forecast(station.id, timestamp)
+
+
+def __get_forecast(station_id, timestamp):
+    d = datetime.fromtimestamp(timestamp)
+    db = get_db()
+    q = db.query(models.ForecastData).filter(
+        models.ForecastData.station_id == station_id,
+        models.ForecastData.date == d.date()
+    )
+    forecasts = []
+    for data in q.all():
+        forecasts.append(dict(
+            forecast=data,
+            timediff=abs((d.time().hour * 60 + d.time().minute) - (data.time.hour * 60 + data.time.minute))
+        ))
+    forecast = sorted(forecasts, key=lambda k: k['timediff'])[0]['forecast']
+    return forecast
