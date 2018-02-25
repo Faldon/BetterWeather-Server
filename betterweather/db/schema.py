@@ -59,12 +59,14 @@ def schema_create(db, force=False, verbose=False):
                     db.rollback()
             except exc.OperationalError as err_operational:
                 if re.search(r'table db_information already exists', err_operational.__str__()):
+                    db.rollback()
                     continue
                 else:
                     db.rollback()
                     success = success and False
             except exc.IntegrityError as err_integrity:
                 if re.search(r'UNIQUE constraint failed: db_information.name', err_integrity.__str__()):
+                    db.rollback()
                     continue
                 else:
                     db.rollback()

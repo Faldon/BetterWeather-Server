@@ -12,7 +12,8 @@ def import_stations_from_sql(path_to_file, db):
             db.execute(query)
         db.commit()
         return True
-    except exc.DBAPIError:
+    except exc.DBAPIError as err_dbapi:
+        print(err_dbapi)
         db.rollback()
         return False
 

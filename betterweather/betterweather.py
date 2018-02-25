@@ -64,9 +64,13 @@ def schema_update_command(force, verbose):
 
 @app.cli.command('import_weatherstations')
 @click.argument("path_to_file")
-def import_staions(path_to_file):
+@click.option('--file_format', help='The file format to use [default=csv]', type=click.Choice(['csv', 'sql']))
+def import_staions(path_to_file, file_format):
     """Import weather station data from csv"""
-    stations.import_stations_from_csv(path_to_file, get_db())
+    if not file_format or file_format == 'csv':
+        stations.import_stations_from_csv(path_to_file, get_db())
+    else:
+        stations.import_stations_from_sql(path_to_file, get_db())
 
 
 @app.cli.command('get_forecast_data')
