@@ -11,6 +11,7 @@ app = Flask(__name__)
 app.config.from_object('betterweather.settings')
 app.config.from_envvar('BETTERWEATHER_SETTINGS', silent=True)
 
+
 if __name__ == "__main__":
     app.run()
 
@@ -18,6 +19,9 @@ if __name__ == "__main__":
 def connect_db():
     if not hasattr(g, 'db_engine'):
         g.db_engine = get_db_engine(app.config['DATABASE'])
+    if not g.db_engine:
+        print("No database engine created.")
+        exit(1)
     session = create_db_connection(g.db_engine)
     return session
 
@@ -27,8 +31,8 @@ def get_db():
 
 
 @app.teardown_appcontext
-def close_db():
-    if hasattr(g, 'db_engine'):
+def close_db(err):
+    if hasattr(g, 'db_engine') and g.db_engine:
         g.db_engine.dispose()
 
 
@@ -50,8 +54,9 @@ def schema_create_command(sql):
 def schema_initialize_db_command(sql, force):
     """Initialize the database records."""
     db = get_db()
-    if not schema.initialize_db(db, force, sql):
-        print('There was an error initializing the database.')
+    with app.open_resource('db/db_init.sql', 'r') as sqlfile:
+        if not schema.initialize_db(db, sqlfile, force, sql):
+            print('There was an error initializing the database.')
 
 
 @app.cli.command('schema_drop')

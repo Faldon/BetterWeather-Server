@@ -1,4 +1,3 @@
-import re
 from sqlalchemy.orm.session import Session
 from sqlalchemy import exc
 DB_VERSION = 1
@@ -8,7 +7,15 @@ def get_version():
     return DB_VERSION
 
 
-def initialize_db(db, force=False, verbose=False):
+def initialize_db(db, sqlfile, force=False, verbose=False):
+    """
+
+    :param sqlalchemy.orm.session.Session db:
+    :param TextIO sqlfile:
+    :param force:
+    :param verbose:
+    :return:
+    """
     result = db.execute('SELECT version FROM db_information')
     row = result.fetchone()
     if row:
@@ -21,7 +28,7 @@ def initialize_db(db, force=False, verbose=False):
                        {'version': DB_VERSION, 'name': 'BetterWeather'})
         if verbose:
             print("INSERT INTO db_information VALUES ('BetterWeather', " + DB_VERSION.__str__() + ");")
-        for code in open('weathercodes.sql'):
+        for code in sqlfile:
             if force:
                 db.execute(code)
             if verbose:

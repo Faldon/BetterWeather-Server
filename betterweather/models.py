@@ -15,8 +15,8 @@ class WeatherCode(Base):
     __tablename__ = 'weather_codes'
     id = Column(Integer, primary_key=True)
     precipitation = Column(Boolean, nullable=False)
-    key_group_ouline = Column(String(255), nullable=False)
-    weather_ouline = Column(String(255), nullable=False)
+    key_group_outline = Column(String(255), nullable=False)
+    weather_outline = Column(String(255), nullable=False)
     weather_detail_1 = Column(String(255), nullable=True, default=None)
     weather_detail_2 = Column(String(255), nullable=True, default=None)
 
@@ -25,8 +25,8 @@ class WeatherStation(Base):
     __tablename__ = 'weather_stations'
     id = Column(String(5), primary_key=True)
     name = Column(String(255), nullable=False)
-    latitude = Column(Numeric(8, 6), nullable=False)
-    longitude = Column(Numeric(8, 6), nullable=False)
+    latitude = Column(Numeric(9, 6), nullable=False)
+    longitude = Column(Numeric(9, 6), nullable=False)
     amsl = Column(Integer)
 
 

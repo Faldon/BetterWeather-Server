@@ -17,8 +17,12 @@ def get_db_engine(config):
         uri += ":" + config.get('PORT')
 
     uri += '/' + config.get('NAME')
-    engine = create_engine(uri)
-    return engine
+    try:
+        engine = create_engine(uri)
+        return engine
+    except ModuleNotFoundError as err_module_not_found:
+        print(err_module_not_found)
+        return None
 
 
 def create_db_connection(engine):
