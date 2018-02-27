@@ -5,6 +5,22 @@ from sqlalchemy.orm import relationship
 Base = declarative_base()
 
 
+class DBInformation(Base):
+    __tablename__ = 'db_information'
+    name = Column(String(13), primary_key=True)
+    version = Column(Integer, nullable=False)
+
+
+class WeatherCode(Base):
+    __tablename__ = 'weather_codes'
+    id = Column(Integer, primary_key=True)
+    precipitation = Column(Boolean, nullable=False)
+    key_group_ouline = Column(String(255), nullable=False)
+    weather_ouline = Column(String(255), nullable=False)
+    weather_detail_1 = Column(String(255), nullable=True, default=None)
+    weather_detail_2 = Column(String(255), nullable=True, default=None)
+
+
 class WeatherStation(Base):
     __tablename__ = 'weather_stations'
     id = Column(String(5), primary_key=True)

@@ -23,7 +23,7 @@ def get_db_engine(config):
 
 def create_db_connection(engine):
     """
-    :type engine: sqlalchemy.engine.Engine
+    :param sqlalchemy.engine.Engine engine: The sqlalchem engine to use
     :return sqlachemy.orm.session.Session
     """
     Session = sessionmaker(bind=engine, autocommit=True)

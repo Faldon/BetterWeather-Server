@@ -8,77 +8,30 @@ def get_version():
     return DB_VERSION
 
 
-def schema_create(db, force=False, verbose=False):
-    """
-    Creates the database information schema
-    :param Session db: A SQLAlchemy database session
-    :param bool force: Execute the query on the session
-    :param bool verbose: Dump the sql query to the console
-    :return: False, if an error occured, else True
-    """
-    queries = [
-        {
-            'sql': """CREATE TABLE db_information (
-    name CHAR(13) NOT NULL PRIMARY KEY,
-    version INT NOT NULL
-);""",
-            'params': None
-        },
-        {
-            'sql': """INSERT INTO db_information VALUES (
-    :name,
-    :version
-);""",
-            'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
-        },
-        {
-            'sql': """CREATE TABLE weather_codes (
-    id INT NOT NULL PRIMARY KEY,
-    precipitation BOOLEAN NOT NULL,
-    key_group_outline VARCHAR(255) NOT NULL,
-    weather_outline VARCHAR(255) NOT NULL,
-    weather_detail_1 VARCHAR(255) DEFAULT NULL,
-    weather_detail_2 VARCHAR(255) DEFAULT NULL
-);""",
-            'params': None
-        }
-    ]
-
-    success = True
+def initialize_db(db, force=False, verbose=False):
+    result = db.execute('SELECT version FROM db_information')
+    row = result.fetchone()
+    if row:
+        print('Database already initialized')
+        return False
+    db.begin(subtransactions=True)
     try:
-        db.begin(subtransactions=True)
+        if force:
+            db.execute('INSERT INTO db_information VALUES (:name, :version);',
+                       {'version': DB_VERSION, 'name': 'BetterWeather'})
         if verbose:
-            __print_raw_sql(queries)
-        for query in queries:
-            try:
-                db.begin(subtransactions=True)
-                db.execute(query['sql'], query['params'])
-                if force:
-                    db.commit()
-                else:
-                    db.rollback()
-            except exc.OperationalError as err_operational:
-                if re.search(r'table db_information already exists', err_operational.__str__()):
-                    db.rollback()
-                    continue
-                else:
-                    db.rollback()
-                    success = success and False
-            except exc.IntegrityError as err_integrity:
-                if re.search(r'UNIQUE constraint failed: db_information.name', err_integrity.__str__()):
-                    db.rollback()
-                    continue
-                else:
-                    db.rollback()
-                    success = success and False
-        if success and force:
+            print("INSERT INTO db_information VALUES ('BetterWeather', " + DB_VERSION.__str__() + ");")
+        for code in open('weathercodes.sql'):
+            if force:
+                db.execute(code)
+            if verbose:
+                print(code)
+        if force:
             db.commit()
-        return success
+        return True
     except exc.DBAPIError as err_dbapi:
         print(err_dbapi)
-        db.rollback()
-        success = success and False
-        return success
+        return False
 
 
 def schema_update(db, force=False, verbose=False):
@@ -89,32 +42,36 @@ def schema_update(db, force=False, verbose=False):
     :param bool verbose: Dump the sql query to the console
     :return: False, if an error occured, else True
     """
+    queries = []
     db.begin(subtransactions=True)
     result = db.execute('SELECT version FROM db_information')
+    row = result.fetchone()
+    if not row:
+        print('Database not initialized yet.')
+        return False
     version = result.fetchone()['version']
-    queries = []
-    try:
-        for i in range(version, DB_VERSION):
-            pass
+    if version != DB_VERSION:
         queries.append({
             'sql': """UPDATE db_information 
     SET version=:version
-    WHERE name=:name""",
+    WHERE name=:name;""",
             'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
         })
-        if verbose:
-            __print_raw_sql(queries)
-        for query in queries:
-            db.execute(query['sql'], query['params'])
-        if force:
-            db.commit()
-        else:
+        for i in range(version, DB_VERSION):
+            pass
+    if verbose:
+        __print_raw_sql(queries)
+    if force:
+        try:
+            for query in queries:
+                db.execute(query['sql'], query['params'])
+                db.commit()
+            return True
+        except exc.DBAPIError as err_dbapi:
+            print(err_dbapi)
             db.rollback()
-        return True
-    except exc.DBAPIError as err_dbapi:
-        print(err_dbapi)
-        db.rollback()
-        return False
+            return False
+    return True
 
 
 def __print_raw_sql(queries):
