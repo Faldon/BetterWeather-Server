@@ -124,6 +124,15 @@ def forecastdata_print_command(station_id, forecast_date):
     print(forecast.to_json())
 
 
+@app.cli.command('maintenance_cronjob')
+def maintenance_cronjob_command():
+    """Prints the default command to update forecast data as cronjob"""
+    print('export BETTERWEATHER_SETTINGS=' + app.root_path + '/production.py;', end='')
+    print('cd ' + app.root_path + '/../;', end='')
+    print('. venv/bin/activate;', end='')
+    print('flask forecastdata_retrieve --file_format=ascii')
+
+
 @app.route('/forecast/station/<station_id>/now')
 def get_current_station_forecast(station_id):
     t = datetime.now().timestamp()
