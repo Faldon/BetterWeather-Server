@@ -1,5 +1,4 @@
 import click
-import json
 from flask import Flask, g, jsonify
 from datetime import datetime
 from sqlalchemy.schema import CreateTable, MetaData
@@ -85,10 +84,10 @@ def schema_migrate_command(sql, force):
         print('An error occured during migration operation.')
 
 
-@app.cli.command('import_weatherstations')
+@app.cli.command('weatherstation_import')
 @click.argument("path_to_file")
 @click.option('--file_format', help='The file format to use [default=csv]', type=click.Choice(['csv', 'sql']))
-def import_staions_command(path_to_file, file_format):
+def weatherstation_import_command(path_to_file, file_format):
     """Import weather station data from file."""
     if not file_format or file_format == 'csv':
         stations.import_stations_from_csv(path_to_file, get_db())
@@ -96,11 +95,11 @@ def import_staions_command(path_to_file, file_format):
         stations.import_stations_from_sql(path_to_file, get_db())
 
 
-@app.cli.command('get_forecast_data')
+@app.cli.command('forecastdata_retrieve')
 @click.option('--file_format', help='The file format to use [default=csv]', type=click.Choice(['csv', 'kml', 'ascii']))
 @click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
-def update_forecast_command(file_format, verbose):
-    """Get weather forecast from online service."""
+def forecastdata_retrieve_command(file_format, verbose):
+    """Update forecast data from online service."""
     if not file_format or file_format == 'csv':
         return stations.update_mosmix_poi(app.config['FORECASTS_URL_CSV'], get_db(), verbose)
     if file_format == 'ascii':
@@ -109,12 +108,20 @@ def update_forecast_command(file_format, verbose):
         return stations.update_mosmix_o_underline(app.config['FORECASTS_URL_KML'], get_db(), verbose)
 
 
-@app.cli.command('print_current_station_forecast')
+@app.cli.command('forecastdata_print')
 @click.argument('station_id')
-def print_current_station_forecast_command(station_id):
-    t = datetime.now().timestamp()
+@click.option('--forecast_date', help='The time for the forecast formatted %Y-%m-%d %H:%M [default=now]')
+def forecastdata_print_command(station_id, forecast_date):
+    """Print forecast data for weather station."""
+    try:
+        t = datetime.strptime(forecast_date, '%Y-%m-%d %H:%M').timestamp()
+    except ValueError:
+        t = datetime.now().timestamp()
+    except TypeError:
+        t = datetime.now().timestamp()
+
     forecast = __get_forecast(station_id, t)
-    print(forecast.id)
+    print(forecast.to_json())
 
 
 @app.route('/forecast/station/<station_id>/now')
@@ -132,6 +139,7 @@ def get_current_location_forecast(latitude, longitude):
 @app.route('/forecast/station/<station_id>/<timestamp>')
 def get_station_forecast(station_id, timestamp):
     forecast = __get_forecast(station_id, timestamp)
+    return jsonify(forecast.to_dict())
 
 
 @app.route('/forecast/location/<latitude>/<longitude>/timestamp')
@@ -153,5 +161,7 @@ def __get_forecast(station_id, timestamp):
             forecast=data,
             timediff=abs((d.time().hour * 60 + d.time().minute) - (data.time.hour * 60 + data.time.minute))
         ))
-    forecast = sorted(forecasts, key=lambda k: k['timediff'])[0]['forecast']
-    return forecast
+    sorted_data = sorted(forecasts, key=lambda k: k['timediff'])
+    if sorted_data:
+        return sorted_data[0]['forecast']
+    return None

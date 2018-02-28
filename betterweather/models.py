@@ -1,3 +1,4 @@
+import json
 from sqlalchemy import *
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -78,6 +79,100 @@ class ForecastData(Base):
 
     station = relationship("WeatherStation", back_populates="forecast_data")
     __table_args__ = (UniqueConstraint('station_id', 'date', 'time', name='uq_forecast_data.station_id_date_time'),)
+
+    def to_json(self):
+        return json.dumps({
+            'id': self.id,
+            'station_id': self.station_id,
+            'date': self.date.__str__(),
+            'time': self.time.__str__(),
+            't': self.t,
+            'tt': self.tt,
+            'td': self.td,
+            'tx': self.tx,
+            'tn': self.tn,
+            'tm': self.tm,
+            'tg': self.tg,
+            'dd': self.dd,
+            'ff': self.ff,
+            'fx': self.fx,
+            'fx6': self.fx6,
+            'fx9': self.fx9,
+            'fx11': self.fx11,
+            'rr1': self.rr1,
+            'rr3': self.rr3,
+            'rr6': self.rr6,
+            'rr12': self.rr12,
+            'rr24': self.rr24,
+            'rrp6': self.rrp6,
+            'rrp12': self.rrp12,
+            'rrp24': self.rrp24,
+            'ev': self.ev,
+            'ww': self.ww,
+            'w': self.w,
+            'vv': self.vv,
+            'n': self.n,
+            'nf': self.nf,
+            'nl': self.nl,
+            'nm': self.nm,
+            'nh': self.nh,
+            'pppp': self.pppp,
+            'ss1': self.ss1,
+            'ss24': self.ss24,
+            'gss1': self.gss1,
+            'gss3': self.gss3,
+            'qsw1': self.qsw1,
+            'qsw3': self.qsw3,
+            'qlw1': self.qlw1,
+            'qlw3': self.qlw3
+        })
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'station_id': self.station_id,
+            'date': self.date.__str__(),
+            'time': self.time.__str__(),
+            't': self.t,
+            'tt': self.tt,
+            'td': self.td,
+            'tx': self.tx,
+            'tn': self.tn,
+            'tm': self.tm,
+            'tg': self.tg,
+            'dd': self.dd,
+            'ff': self.ff,
+            'fx': self.fx,
+            'fx6': self.fx6,
+            'fx9': self.fx9,
+            'fx11': self.fx11,
+            'rr1': self.rr1,
+            'rr3': self.rr3,
+            'rr6': self.rr6,
+            'rr12': self.rr12,
+            'rr24': self.rr24,
+            'rrp6': self.rrp6,
+            'rrp12': self.rrp12,
+            'rrp24': self.rrp24,
+            'ev': self.ev,
+            'ww': self.ww,
+            'w': self.w,
+            'vv': self.vv,
+            'n': self.n,
+            'nf': self.nf,
+            'nl': self.nl,
+            'nm': self.nm,
+            'nh': self.nh,
+            'pppp': self.pppp,
+            'ss1': self.ss1,
+            'ss24': self.ss24,
+            'gss1': self.gss1,
+            'gss3': self.gss3,
+            'qsw1': self.qsw1,
+            'qsw3': self.qsw3,
+            'qlw1': self.qlw1,
+            'qlw3': self.qlw3
+        }
 
 
 WeatherStation.forecast_data = relationship("ForecastData", order_by=ForecastData.id, back_populates="station")

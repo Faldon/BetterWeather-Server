@@ -4,7 +4,7 @@ import os
 import bz2
 from sqlalchemy import exc
 from urllib import request, error
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import sin, cos, sqrt, atan2, radians
 from betterweather.models import *
 
@@ -230,6 +230,8 @@ def update_mosmix_o_underline(root_url, db, verbose):
                                 amsl=station_amsl
                             )
                             db.add(weather_station)
+                            if verbose:
+                                print('New station ' + station_id + ' added.')
                     csv_reader = csv.reader(weather_forecast_data, delimiter=" ")
                     creation_time = None
                     for row in csv_reader:
@@ -244,7 +246,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
                                 cf = 1
                             station_id = row[cf]
                             if station_id != '99999' and row[cf + 1] != '*':
-                                dt_object = creation_time.replace(day=int(row[cf + 2][:2]), hour=int(row[cf + 2][2:]))
+                                dt_object = creation_time + timedelta(hours=int(row[cf + 1]))
                                 dp = ForecastData(
                                     date=dt_object.date(),
                                     time=dt_object.time(),
@@ -291,7 +293,8 @@ def update_mosmix_o_underline(root_url, db, verbose):
                                 ).delete()
                                 db.add(dp)
                                 if verbose:
-                                    print('.', end='')
+                                    print('Added forecast for station ' + dp.station_id, end='')
+                                    print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
                         except ValueError as err_value:
                             print(row)
                             print(err_value)
