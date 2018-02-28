@@ -11,6 +11,7 @@ betterweather/production.py
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/dictionaries
+.idea/**/dbnavigator.xml
 
 # Sensitive or high-churn files:
 .idea/**/dataSources/
