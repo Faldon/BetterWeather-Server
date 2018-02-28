@@ -219,8 +219,10 @@ def update_mosmix_o_underline(root_url, db, verbose):
                         if not data:
                             station_name = ''.join(row)[8:23].strip()
                             props = ''.join(row)[24:].split()
-                            station_longitude = float(props[0])
-                            station_latitude = float(props[1])
+                            lon = props[0][:-2] + '.' + props[0][-2:]
+                            lat = props[1][:-2] + '.' + props[1][-2:]
+                            station_longitude = float(lon)
+                            station_latitude = float(lat)
                             station_amsl = int(props[2])
                             weather_station = WeatherStation(
                                 id=station_id,
