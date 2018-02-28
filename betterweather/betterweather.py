@@ -121,6 +121,9 @@ def forecastdata_print_command(station_id, forecast_date):
         t = datetime.now().timestamp()
 
     forecast = __get_forecast(station_id, t)
+    if not forecast:
+        print(forecast)
+        return
     print(forecast.to_json())
 
 
@@ -130,7 +133,8 @@ def maintenance_cronjob_command():
     print('export BETTERWEATHER_SETTINGS=' + app.root_path + '/production.py;', end='')
     print('cd ' + app.root_path + '/../;', end='')
     print('. venv/bin/activate;', end='')
-    print('flask forecastdata_retrieve --file_format=ascii')
+    print('flask forecastdata_retrieve --file_format=ascii;', end='')
+    print('flask forecastdata_retrieve --file_format=csv')
 
 
 @app.route('/forecast/station/<station_id>/now')
@@ -148,6 +152,8 @@ def get_current_location_forecast(latitude, longitude):
 @app.route('/forecast/station/<station_id>/<timestamp>')
 def get_station_forecast(station_id, timestamp):
     forecast = __get_forecast(station_id, timestamp)
+    if not forecast:
+        return jsonify(forecast)
     return jsonify(forecast.to_dict())
 
 

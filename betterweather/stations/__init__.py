@@ -103,6 +103,9 @@ def update_mosmix_poi(root_url, db, verbose):
             station_id = link.__str__()[:5].replace("_", "")
             if verbose:
                 print("Processing station " + station_id)
+            data = db.query(WeatherStation).filter(WeatherStation.id == station_id).all()
+            if not data:
+                continue
             url = root_url + link
             try:
                 file = request.urlretrieve(url)
@@ -113,10 +116,13 @@ def update_mosmix_poi(root_url, db, verbose):
             with open(file[0], 'r') as forecast_for_station:
                 csv_reader = csv.reader(forecast_for_station, delimiter=";")
                 for row in csv_reader:
+                    try:
+                        dt_object = datetime.strptime(row[0], '%d.%m.%y')
+                    except ValueError:
+                        continue
                     for i in range(0, len(row)):
                         row[i] = row[i].replace(',', '.').replace(' ', '')
                     try:
-                        dt_object = datetime.strptime(row[0], '%d.%m.%y')
                         dp = ForecastData(
                             date=dt_object.date(),
                             time=datetime.strptime(row[1], '%H:%M').time(),
@@ -162,8 +168,11 @@ def update_mosmix_poi(root_url, db, verbose):
                         ).delete()
                         db.add(dp)
                         if verbose:
-                            print('.', end='')
-                    except ValueError:
+                            print('Added forecast for station ' + dp.station_id, end='')
+                            print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+                    except ValueError as err_value:
+                        if verbose:
+                            print(err_value)
                         continue
                 if verbose:
                         print('\nProcessing data for station ' + station_id + ' finished.')
@@ -184,7 +193,7 @@ def update_mosmix_poi(root_url, db, verbose):
 
 def update_mosmix_o_underline(root_url, db, verbose):
     """
-        Update weather forecast from mosmix poi o_underline
+        Update weather forecast from mosmix o_underline
         :param str root_url: The link to the directory containing the files
         :param sqlachemy.orm.session.Session db: A SQLAlchemy database session
         :param bool verbose: Print verbose output
