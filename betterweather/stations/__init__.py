@@ -211,7 +211,26 @@ def update_mosmix_o_underline(root_url, db, verbose):
                     continue
                 with bz2.open(file[0], 'rb') as forecast_for_station:
                     data = forecast_for_station.read().decode('latin-1').splitlines()
-                    csv_reader = csv.reader(data, delimiter=" ")
+                    station_data = [e for e in data if re.search(r'\*', e)]
+                    weather_forecast_data = [e for e in data if not re.search(r'\*', e)]
+                    for row in station_data:
+                        station_id = row[0:5].strip()
+                        data = db.query(WeatherStation).filter(WeatherStation.id == station_id).all()
+                        if not data:
+                            station_name = ''.join(row)[8:23].strip()
+                            props = ''.join(row)[24:].split()
+                            station_longitude = float(props[0])
+                            station_latitude = float(props[1])
+                            station_amsl = int(props[2])
+                            weather_station = WeatherStation(
+                                id=station_id,
+                                name=station_name,
+                                latitude=station_latitude,
+                                longitude=station_longitude,
+                                amsl=station_amsl
+                            )
+                            db.add(weather_station)
+                    csv_reader = csv.reader(weather_forecast_data, delimiter=" ")
                     creation_time = None
                     for row in csv_reader:
                         try:
