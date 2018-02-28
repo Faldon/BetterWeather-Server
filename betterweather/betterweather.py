@@ -1,3 +1,5 @@
+import os
+import socket
 import click
 from flask import Flask, g, jsonify
 from datetime import datetime
@@ -127,14 +129,48 @@ def forecastdata_print_command(station_id, forecast_date):
     print(forecast.to_json())
 
 
-@app.cli.command('maintenance_cronjob')
-def maintenance_cronjob_command():
+@app.cli.command('config_cronjob')
+def config_cronjob_command():
     """Prints the default command to update forecast data as cronjob"""
     print('export BETTERWEATHER_SETTINGS=' + app.root_path + '/production.py;', end='')
     print('cd ' + app.root_path + '/../;', end='')
     print('. venv/bin/activate;', end='')
     print('flask forecastdata_retrieve --file_format=ascii;', end='')
     print('flask forecastdata_retrieve --file_format=csv')
+
+
+@app.cli.command('config_apache')
+@click.option('--server_name', help='The name of your server [default to your hostname]')
+def config_apache_command(server_name):
+    """Prints the default apache2 config file"""
+    if not server_name:
+        server_name = socket.getfqdn()
+    print("""# Virtual Host config for BetterWeather WSGI Server
+# Required modules: mod_wsgi
+<VirtualHost *:80>
+    ServerName """, end='')
+    print(server_name, end='')
+    print("""
+    WSGIDaemonProcess betterweather threads=15
+    WSGIScriptAlias / """, end='')
+    print(app.root_path + '/wsgi.py', end='')
+    print("""
+    <Directory """, end='')
+    print(os.path.dirname(os.path.dirname(os.path.abspath(__file__))).__str__() + '>', end='')
+    print("""
+        WSGIProcessGroup betterweather
+        WSGIApplicationGroup %{GLOBAL}
+        
+        <IfVersion < 2.4>
+            Allow from all
+            Order allow,deny
+        </IfVersion>
+        
+        <IfVersion >= 2.4>
+            Require all granted
+        </IfVersion>
+    </Directory>
+</VirtualHost>""")
 
 
 @app.route('/forecast/station/<station_id>/now')
