@@ -26,7 +26,7 @@ class WeatherStation(Base):
     __tablename__ = 'weather_stations'
     id = Column(String(5), primary_key=True)
     name = Column(String(255), nullable=False)
-    latitude = Column(Numeric(9, 6), nullable=False)
+    latitude = Column(Numeric(8, 6), nullable=False)
     longitude = Column(Numeric(9, 6), nullable=False)
     amsl = Column(Integer)
 
