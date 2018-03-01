@@ -30,6 +30,24 @@ class WeatherStation(Base):
     longitude = Column(Numeric(9, 6), nullable=False)
     amsl = Column(Integer)
 
+    def to_json(self):
+        return json.dumps({
+            'id': self.id,
+            'name': self.name,
+            'latitude': self.latitude.__str__(),
+            'longitude': self.longitude.__str__(),
+            'amsl': self.amsl.__str__()
+        })
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'latitude': self.latitude.__str__(),
+            'longitude': self.longitude.__str__(),
+            'amsl': self.amsl.__str__()
+        }
+
 
 class ForecastData(Base):
     __tablename__ = 'forecast_data'

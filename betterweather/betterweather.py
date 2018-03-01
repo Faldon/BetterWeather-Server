@@ -97,6 +97,26 @@ def weatherstation_import_command(path_to_file, file_format):
         stations.import_stations_from_sql(path_to_file, get_db())
 
 
+@app.cli.command('weatherstation_info')
+@click.argument('station_id')
+def weatherstation_info_command(station_id):
+    """Get weather station info for given id"""
+    db = get_db()
+    station = db.query(models.WeatherStation).filter(models.WeatherStation.id == station_id).first()
+    if not station:
+        print(station)
+        return
+    print(station.to_json())
+
+
+@app.cli.command('weatherstation_nearest')
+@click.argument('latitude')
+@click.argument('longitude')
+def weatherstation_nearest_command(latitude, longitude):
+    """Get nearest weather station for geolocation"""
+    print(stations.get_nearest_station(get_db(), latitude, longitude).to_json())
+
+
 @app.cli.command('forecastdata_retrieve')
 @click.option('--file_format', help='The file format to use [default=csv]', type=click.Choice(['csv', 'kml', 'ascii']))
 @click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
@@ -174,29 +194,43 @@ def config_apache_command(server_name):
 
 
 @app.route('/forecast/station/<station_id>/now')
-def get_current_station_forecast(station_id):
+def get_forecast_by_station_for_now(station_id):
     t = datetime.now().timestamp()
-    return get_station_forecast(station_id, t)
+    return get_forecast_by_station_for_time(station_id, t)
 
 
 @app.route('/forecast/location/<latitude>/<longitude>/now')
-def get_current_location_forecast(latitude, longitude):
+def get_forecast_by_location_for_now(latitude, longitude):
     t = datetime.now().timestamp()
-    return get_location_forecast(latitude, longitude, t)
+    return get_forecast_by_location_for_time(latitude, longitude, t)
 
 
 @app.route('/forecast/station/<station_id>/<timestamp>')
-def get_station_forecast(station_id, timestamp):
+def get_forecast_by_station_for_time(station_id, timestamp):
     forecast = __get_forecast(station_id, timestamp)
     if not forecast:
         return jsonify(forecast)
     return jsonify(forecast.to_dict())
 
 
-@app.route('/forecast/location/<latitude>/<longitude>/timestamp')
-def get_location_forecast(latitude, longitude, timestamp):
+@app.route('/forecast/location/<latitude>/<longitude>/<timestamp>')
+def get_forecast_by_location_for_time(latitude, longitude, timestamp):
     station = stations.get_nearest_station(get_db(), latitude, longitude)
-    return get_station_forecast(station.id, timestamp)
+    return get_forecast_by_station_for_time(station.id, timestamp)
+
+
+@app.route('/station/location/<latitude>/<longitude>')
+def get_station_by_location(latitude, longitude):
+    return jsonify(stations.get_nearest_station(get_db(), latitude, longitude).to_dict())
+
+
+@app.route('/station/<station_id>')
+def get_station_by_id(station_id):
+    db = get_db()
+    station = db.query(models.WeatherStation).filter(models.WeatherStation.id == station_id).first()
+    if not station:
+        return jsonify(station)
+    return jsonify(station.to_dict())
 
 
 def __get_forecast(station_id, timestamp):

@@ -103,7 +103,7 @@ def update_mosmix_poi(root_url, db, verbose):
             station_id = link.__str__()[:5].replace("_", "")
             if verbose:
                 print("Processing station " + station_id)
-            data = db.query(WeatherStation).filter(WeatherStation.id == station_id).all()
+            data = db.query(WeatherStation).filter(WeatherStation.id == station_id).first()
             if not data:
                 continue
             url = root_url + link
@@ -224,7 +224,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
                     weather_forecast_data = [e for e in data if not re.search(r'\*', e)]
                     for row in station_data:
                         station_id = row[0:5].strip()
-                        data = db.query(WeatherStation).filter(WeatherStation.id == station_id).all()
+                        data = db.query(WeatherStation).filter(WeatherStation.id == station_id).first()
                         if not data:
                             station_name = ''.join(row)[8:23].strip()
                             props = ''.join(row)[24:].split()
