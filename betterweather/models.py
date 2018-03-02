@@ -21,6 +21,16 @@ class WeatherCode(Base):
     weather_detail_1 = Column(String(255), nullable=True, default=None)
     weather_detail_2 = Column(String(255), nullable=True, default=None)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'precipitation': self.precipitation,
+            'key_group_outline': self.key_group_outline,
+            'weather_outline': self.weather_outline,
+            'weather_detail_1': self.weather_detail_1,
+            'weather_detail_2': self.weather_detail_2
+        }
+
 
 class WeatherStation(Base):
     __tablename__ = 'weather_stations'
@@ -34,18 +44,18 @@ class WeatherStation(Base):
         return json.dumps({
             'id': self.id,
             'name': self.name,
-            'latitude': self.latitude.__str__(),
-            'longitude': self.longitude.__str__(),
-            'amsl': self.amsl.__str__()
+            'latitude': float(self.latitude.__str__()),
+            'longitude': float(self.longitude.__str__()),
+            'amsl': self.amsl
         })
 
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
-            'latitude': self.latitude.__str__(),
-            'longitude': self.longitude.__str__(),
-            'amsl': self.amsl.__str__()
+            'latitude': float(self.latitude.__str__()),
+            'longitude': float(self.longitude.__str__()),
+            'amsl': self.amsl
         }
 
 
@@ -99,6 +109,7 @@ class ForecastData(Base):
     __table_args__ = (UniqueConstraint('station_id', 'date', 'time', name='uq_forecast_data.station_id_date_time'),)
 
     def to_json(self):
+        """Return the object as JSON"""
         return json.dumps({
             'id': self.id,
             'station_id': self.station_id,
@@ -145,10 +156,16 @@ class ForecastData(Base):
             'qlw3': self.qlw3
         })
 
-    def to_dict(self):
+    def to_dict(self, full=False):
+        """Convert ForecastData to dict
+
+        :param bool full: Include related objects
+        :returns The object as dict
+        :rtype dict
+        """
         return {
             'id': self.id,
-            'station_id': self.station_id,
+            'station': self.station_id if not full else self.station.to_dict(),
             'date': self.date.__str__(),
             'time': self.time.__str__(),
             't': self.t,

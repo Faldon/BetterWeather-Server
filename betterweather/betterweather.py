@@ -1,9 +1,10 @@
 import os
 import socket
 import click
-from flask import Flask, g, jsonify
+from flask import Flask, g, jsonify, request
 from datetime import datetime
 from sqlalchemy.schema import CreateTable, MetaData
+from sqlalchemy.orm import joinedload
 from betterweather.db import schema, create_db_connection, get_db_engine
 from betterweather import stations, models
 
@@ -40,7 +41,7 @@ def close_db(err):
 @app.cli.command('schema_create')
 @click.option('--sql', is_flag=True, help='Dump the sql command to the console')
 def schema_create_command(sql):
-    """Create the database tables."""
+    """Create the database schema"""
     db = get_db()
     if sql:
         for table in models.Base.metadata.tables:
@@ -53,7 +54,7 @@ def schema_create_command(sql):
 @click.option('--sql', is_flag=True, help='Dump the sql command to the console')
 @click.option('--force', is_flag=True, help='Force the operation on the connected database')
 def schema_initialize_db_command(sql, force):
-    """Initialize the database records."""
+    """Initialize the database records"""
     db = get_db()
     with app.open_resource('db/db_init.sql', 'r') as sqlfile:
         if not schema.initialize_db(db, sqlfile, force, sql):
@@ -65,7 +66,7 @@ def schema_initialize_db_command(sql, force):
 @click.option('--force', is_flag=True, help='Force the operation on the connected database')
 @click.option('--full', is_flag=True, help='Delete the whole schema of the connected database')
 def schema_drop_command(sql, force, full):
-    """Drop the database tables."""
+    """Drop the database schema"""
     db = get_db()
     if force:
         models.Base.metadata.drop_all(db.get_bind())
@@ -81,8 +82,9 @@ def schema_drop_command(sql, force, full):
 @click.option('--sql', is_flag=True, help='Dump the sql command to the console')
 @click.option('--force', is_flag=True, help='Force the operation on the connected database')
 def schema_migrate_command(sql, force):
-    """Migrate the database version."""
-    if force and not schema.schema_update(get_db(), force, sql):
+    """Migrate the database version"""
+    success = schema.schema_update(get_db(), force, sql)
+    if not success and force:
         print('An error occured during migration operation.')
 
 
@@ -90,7 +92,7 @@ def schema_migrate_command(sql, force):
 @click.argument("path_to_file")
 @click.option('--file_format', help='The file format to use [default=csv]', type=click.Choice(['csv', 'sql']))
 def weatherstation_import_command(path_to_file, file_format):
-    """Import weather station data from file."""
+    """Import weather station data from file"""
     if not file_format or file_format == 'csv':
         stations.import_stations_from_csv(path_to_file, get_db())
     else:
@@ -121,7 +123,7 @@ def weatherstation_nearest_command(latitude, longitude):
 @click.option('--file_format', help='The file format to use [default=csv]', type=click.Choice(['csv', 'kml', 'ascii']))
 @click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
 def forecastdata_retrieve_command(file_format, verbose):
-    """Update forecast data from online service."""
+    """Update forecast data from online service"""
     if not file_format or file_format == 'csv':
         return stations.update_mosmix_poi(app.config['FORECASTS_URL_CSV'], get_db(), verbose)
     if file_format == 'ascii':
@@ -134,7 +136,7 @@ def forecastdata_retrieve_command(file_format, verbose):
 @click.argument('station_id')
 @click.option('--forecast_date', help='The time for the forecast formatted %Y-%m-%d %H:%M [default=now]')
 def forecastdata_print_command(station_id, forecast_date):
-    """Print forecast data for weather station."""
+    """Print forecast data for weather station"""
     try:
         t = datetime.strptime(forecast_date, '%Y-%m-%d %H:%M').timestamp()
     except ValueError:
@@ -193,33 +195,24 @@ def config_apache_command(server_name):
 </VirtualHost>""")
 
 
-@app.route('/forecast/station/<station_id>/now')
-def get_forecast_by_station_for_now(station_id):
-    t = datetime.now().timestamp()
-    return get_forecast_by_station_for_time(station_id, t)
-
-
-@app.route('/forecast/location/<latitude>/<longitude>/now')
-def get_forecast_by_location_for_now(latitude, longitude):
-    t = datetime.now().timestamp()
-    return get_forecast_by_location_for_time(latitude, longitude, t)
-
-
-@app.route('/forecast/station/<station_id>/<timestamp>')
-def get_forecast_by_station_for_time(station_id, timestamp):
-    forecast = __get_forecast(station_id, timestamp)
+@app.route('/forecast/station/<station_id>/', defaults={'timestamp': datetime.now().timestamp()})
+@app.route('/forecast/station/<station_id>/<int:timestamp>')
+def get_forecast_by_station(station_id, timestamp):
+    full = request.args.get('full', default=False)
+    forecast = __get_forecast(station_id, timestamp, full)
     if not forecast:
         return jsonify(forecast)
-    return jsonify(forecast.to_dict())
+    return jsonify(forecast.to_dict(full))
 
 
-@app.route('/forecast/location/<latitude>/<longitude>/<timestamp>')
-def get_forecast_by_location_for_time(latitude, longitude, timestamp):
+@app.route('/forecast/location/<float:latitude>/<float:longitude>/', defaults={'timestamp': datetime.now().timestamp()})
+@app.route('/forecast/location/<float:latitude>/<float:longitude>/<int:timestamp>')
+def get_forecast_by_location(latitude, longitude, timestamp):
     station = stations.get_nearest_station(get_db(), latitude, longitude)
-    return get_forecast_by_station_for_time(station.id, timestamp)
+    return get_forecast_by_station(station.id, timestamp)
 
 
-@app.route('/station/location/<latitude>/<longitude>')
+@app.route('/station/location/<float:latitude>/<float:longitude>')
 def get_station_by_location(latitude, longitude):
     return jsonify(stations.get_nearest_station(get_db(), latitude, longitude).to_dict())
 
@@ -233,13 +226,30 @@ def get_station_by_id(station_id):
     return jsonify(station.to_dict())
 
 
-def __get_forecast(station_id, timestamp):
+def __get_forecast(station_id, timestamp, full):
+    """Get weather forecast
+
+    Lookup the closest weather forecast of given station for the given time
+    :param str station_id: The station id
+    :param float timestamp: The time for the forecast as timestamp
+    :param bool full: Join related objects to result
+    :return A weather forecast
+    :rtype betterweather.models.ForecastData or None
+    """
     d = datetime.fromtimestamp(timestamp)
     db = get_db()
-    q = db.query(models.ForecastData).filter(
-        models.ForecastData.station_id == station_id,
-        models.ForecastData.date == d.date()
-    )
+    if full:
+        q = db.query(models.ForecastData).options(
+            joinedload(models.ForecastData.station, innerjoin=True)
+        ).filter(
+            models.ForecastData.station_id == station_id,
+            models.ForecastData.date == d.date()
+        )
+    else:
+        q = db.query(models.ForecastData).filter(
+            models.ForecastData.station_id == station_id,
+            models.ForecastData.date == d.date()
+        )
     forecasts = []
     for data in q.all():
         forecasts.append(dict(

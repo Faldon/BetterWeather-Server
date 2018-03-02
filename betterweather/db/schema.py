@@ -56,12 +56,10 @@ def schema_update(db, force=False, verbose=False):
     if not row:
         print('Database not initialized yet.')
         return False
-    version = result.fetchone()['version']
+    version = row['version']
     if version != DB_VERSION:
         queries.append({
-            'sql': """UPDATE db_information 
-    SET version=:version
-    WHERE name=:name;""",
+            'sql': """UPDATE db_information SET version=:version WHERE name=:name;""",
             'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
         })
         for i in range(version, DB_VERSION):
@@ -72,7 +70,7 @@ def schema_update(db, force=False, verbose=False):
         try:
             for query in queries:
                 db.execute(query['sql'], query['params'])
-                db.commit()
+            db.commit()
             return True
         except exc.DBAPIError as err_dbapi:
             print(err_dbapi)
