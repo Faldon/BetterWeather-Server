@@ -123,53 +123,93 @@ def update_mosmix_poi(root_url, db, verbose):
                     for i in range(0, len(row)):
                         row[i] = row[i].replace(',', '.').replace(' ', '')
                     try:
-                        dp = ForecastData(
-                            date=dt_object.date(),
-                            time=datetime.strptime(row[1], '%H:%M').time(),
-                            tt=float(row[2]) if row[2] != "---" else None,
-                            td=float(row[3]) if row[3] != "---" else None,
-                            tx=float(row[4]) if row[4] != "---" else None,
-                            tn=float(row[5]) if row[5] != "---" else None,
-                            tm=float(row[6]) if row[6] != "---" else None,
-                            tg=float(row[7]) if row[7] != "---" else None,
-                            dd=int(row[8]) if row[8] != "---" else None,
-                            ff=float(row[9]) if row[9] != "---" else None,
-                            fx=float(row[10]) if row[10] != "---" else None,
-                            fx6=int(row[11]) if row[11] != "---" else None,
-                            fx9=int(row[12]) if row[12] != "---" else None,
-                            fx11=int(row[13]) if row[13] != "---" else None,
-                            rr1=float(row[14]) if row[14] != "---" else None,
-                            rr3=float(row[15]) if row[15] != "---" else None,
-                            rr6=float(row[16]) if row[16] != "---" else None,
-                            rr12=float(row[17]) if row[17] != "---" else None,
-                            rr24=float(row[18]) if row[18] != "---" else None,
-                            rrp6=int(row[19]) if row[19] != "---" else None,
-                            rrp12=int(row[20]) if row[20] != "---" else None,
-                            rrp24=int(row[21]) if row[21] != "---" else None,
-                            ev=float(row[22]) if row[22] != "---" else None,
-                            ww=int(row[23]) if row[23] != "---" else None,
-                            w=int(row[24]) if row[24] != "---" else None,
-                            vv=float(row[25]) if row[25] != "---" else None,
-                            n=int(row[26]) if row[26] != "---" else None,
-                            nf=int(row[27]) if row[27] != "---" else None,
-                            nl=int(row[28]) if row[28] != "---" else None,
-                            nm=int(row[29]) if row[29] != "---" else None,
-                            nh=int(row[30]) if row[30] != "---" else None,
-                            pppp=float(row[31]) if row[31] != "---" else None,
-                            ss1=float(row[32]) if row[32] != "---" else None,
-                            ss24=float(row[33]) if row[33] != "---" else None,
-                            gss1=float(row[34]) if row[34] != "---" else None,
-                            station_id=station_id
-                        )
-                        db.query(ForecastData).filter(
-                            ForecastData.station_id == dp.station_id,
-                            ForecastData.date == dp.date,
-                            ForecastData.time == dp.time
-                        ).delete()
-                        db.add(dp)
-                        if verbose:
-                            print('Added forecast for station ' + dp.station_id, end='')
-                            print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+                        forecast_date = dt_object.date()
+                        forecast_time = datetime.strptime(row[1], '%H:%M').time()
+                        forecast = db.query(ForecastData).filter(
+                            ForecastData.station_id == station_id,
+                            ForecastData.date == forecast_date,
+                            ForecastData.time == forecast_time
+                        ).first()
+                        if not forecast:
+                            dp = ForecastData(
+                                date=forecast_date,
+                                time=forecast_time,
+                                tt=float(row[2]) if row[2] != "---" else None,
+                                td=float(row[3]) if row[3] != "---" else None,
+                                tx=float(row[4]) if row[4] != "---" else None,
+                                tn=float(row[5]) if row[5] != "---" else None,
+                                tm=float(row[6]) if row[6] != "---" else None,
+                                tg=float(row[7]) if row[7] != "---" else None,
+                                dd=int(row[8]) if row[8] != "---" else None,
+                                ff=float(row[9]) if row[9] != "---" else None,
+                                fx=float(row[10]) if row[10] != "---" else None,
+                                fx6=int(row[11]) if row[11] != "---" else None,
+                                fx9=int(row[12]) if row[12] != "---" else None,
+                                fx11=int(row[13]) if row[13] != "---" else None,
+                                rr1=float(row[14]) if row[14] != "---" else None,
+                                rr3=float(row[15]) if row[15] != "---" else None,
+                                rr6=float(row[16]) if row[16] != "---" else None,
+                                rr12=float(row[17]) if row[17] != "---" else None,
+                                rr24=float(row[18]) if row[18] != "---" else None,
+                                rrp6=int(row[19]) if row[19] != "---" else None,
+                                rrp12=int(row[20]) if row[20] != "---" else None,
+                                rrp24=int(row[21]) if row[21] != "---" else None,
+                                ev=float(row[22]) if row[22] != "---" else None,
+                                ww=int(row[23]) if row[23] != "---" else None,
+                                w=int(row[24]) if row[24] != "---" else None,
+                                vv=float(row[25]) if row[25] != "---" else None,
+                                n=int(row[26]) if row[26] != "---" else None,
+                                nf=int(row[27]) if row[27] != "---" else None,
+                                nl=int(row[28]) if row[28] != "---" else None,
+                                nm=int(row[29]) if row[29] != "---" else None,
+                                nh=int(row[30]) if row[30] != "---" else None,
+                                pppp=float(row[31]) if row[31] != "---" else None,
+                                ss1=float(row[32]) if row[32] != "---" else None,
+                                ss24=float(row[33]) if row[33] != "---" else None,
+                                gss1=float(row[34]) if row[34] != "---" else None,
+                                station_id=station_id
+                            )
+                            db.add(dp)
+                            if verbose:
+                                print('Added forecast for station ' + dp.station_id, end='')
+                                print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+                        else:
+                            forecast.tt = float(row[2]) if row[2] != "---" else forecast.tt
+                            forecast.td = float(row[3]) if row[3] != "---" else forecast.td
+                            forecast.tx = float(row[4]) if row[4] != "---" else forecast.tx
+                            forecast.tn = float(row[5]) if row[5] != "---" else forecast.tn
+                            forecast.tm = float(row[6]) if row[6] != "---" else forecast.tm
+                            forecast.tg = float(row[7]) if row[7] != "---" else forecast.tg
+                            forecast.dd = int(row[8]) if row[8] != "---" else forecast.dd
+                            forecast.ff = float(row[9]) if row[9] != "---" else forecast.ff
+                            forecast.fx = float(row[10]) if row[10] != "---" else forecast.fx
+                            forecast.fx6 = int(row[11]) if row[11] != "---" else forecast.fx6
+                            forecast.fx9 = int(row[12]) if row[12] != "---" else forecast.fx9
+                            forecast.fx11 = int(row[13]) if row[13] != "---" else forecast.fx11
+                            forecast.rr1 = float(row[14]) if row[14] != "---" else forecast.rr1
+                            forecast.rr3 = float(row[15]) if row[15] != "---" else forecast.rr3
+                            forecast.rr6 = float(row[16]) if row[16] != "---" else forecast.rr6
+                            forecast.rr12 = float(row[17]) if row[17] != "---" else forecast.rr12
+                            forecast.rr24 = float(row[18]) if row[18] != "---" else forecast.rr24
+                            forecast.rrp6 = int(row[19]) if row[19] != "---" else forecast.rrp6
+                            forecast.rrp12 = int(row[20]) if row[20] != "---" else forecast.rrp12
+                            forecast.rrp24 = int(row[21]) if row[21] != "---" else forecast.rrp24
+                            forecast.ev = float(row[22]) if row[22] != "---" else forecast.ev
+                            forecast.ww = int(row[23]) if row[23] != "---" else forecast.ww
+                            forecast.w = int(row[24]) if row[24] != "---" else forecast.w
+                            forecast.vv = float(row[25]) if row[25] != "---" else forecast.vv
+                            forecast.n = int(row[26]) if row[26] != "---" else forecast.n
+                            forecast.nf = int(row[27]) if row[27] != "---" else forecast.nf
+                            forecast.nl = int(row[28]) if row[28] != "---" else forecast.nl
+                            forecast.nm = int(row[29]) if row[29] != "---" else forecast.nm
+                            forecast.nh = int(row[30]) if row[30] != "---" else forecast.nh
+                            forecast.pppp = float(row[31]) if row[31] != "---" else forecast.pppp
+                            forecast.ss1 = float(row[32]) if row[32] != "---" else forecast.ss1
+                            forecast.ss24 = float(row[33]) if row[33] != "---" else forecast.ss24
+                            forecast.gss1 = float(row[34]) if row[34] != "---" else forecast.gss1
+                            if verbose:
+                                print('Updated forecast for station ' + station_id, end='')
+                                print(' on ' + forecast_date.__str__() + ' ' + forecast_time.__str__())
                     except ValueError as err_value:
                         if verbose:
                             print(err_value)
@@ -258,58 +298,131 @@ def update_mosmix_o_underline(root_url, db, verbose):
                             station_id = row[cf]
                             if station_id != '99999' and row[cf + 1] != '*':
                                 dt_object = creation_time + timedelta(hours=int(row[cf + 1]))
-                                dp = ForecastData(
-                                    date=dt_object.date(),
-                                    time=dt_object.time(),
-                                    tt=float(row[cf + 3]) if not re.match(r'(-{3}|/{3}|$)', row[cf + 3]) else None,
-                                    td=float(row[cf + 4]) if not re.match(r'(-{3}|/{3}|$)', row[cf + 4]) else None,
-                                    tx=float(row[cf + 5]) if not re.match(r'(-{3}|/{3}|$)', row[cf + 5]) else None,
-                                    tn=float(row[cf + 6]) if not re.match(r'(-{3}|/{3}|$)', row[cf + 6]) else None,
-                                    dd=int(row[cf + 7]) if not re.match(r'(-{2}|/{2}|$)', row[cf + 7]) else None,
-                                    ff=float(row[cf + 8]) * 1.852 if not re.match(r'(-{2}|/{2}|$)', row[cf + 8]) else None,
-                                    fx=float(row[cf + 9]) * 1.852 if not re.match(r'(-{2}|/{2}|$)', row[cf + 9]) else None,
-                                    ww=int(row[cf + 12]) if not re.match(r'(-{2}|/{2}|$)', row[cf + 12]) else None,
-                                    w=int(row[cf + 13]) if not re.match(r'([-/])', row[cf + 13]) else None,
-                                    n=int(row[cf + 14]) if not re.match(r'([-/])', row[cf + 14]) else None,
-                                    nf=int(row[cf + 15]) if not re.match(r'([-/])', row[cf + 15]) else None,
-                                    nl=int(row[cf + 16]) if not re.match(r'([-/])', row[cf + 16]) else None,
-                                    nm=int(row[cf + 17]) if not re.match(r'([-/])', row[cf + 17]) else None,
-                                    nh=int(row[cf + 18]) if not re.match(r'([-/])', row[cf + 18]) else None,
-                                    pppp=float(row[cf + 19]) if not re.match(r'(-{4}|/{4}|$)', row[cf + 19]) else None,
-                                    t=float(row[cf + 20]) if not re.match(r'(-{3}|/{3}|$)', row[cf + 20]) else None,
-                                    station_id=station_id
-                                )
-                                if hours[1] == 1:
-                                    dp.rr1 = float(row[cf + 10]) * 10 if not re.match(
-                                        r'(-{2}|/{2}|$)', row[cf + 10]) else None
-                                    dp.qsw1 = float(row[cf + 21]) * 10 if not re.match(
-                                        r'(-{3}|/{3}|$)', row[cf + 21]) else None
-                                    dp.gss1 = float(row[cf + 22]) * 10 if not re.match(
-                                        r'(-{3}|/{3}|$)', row[cf + 22]) else None
-                                    dp.qlw1 = float(row[cf + 23]) * 10 if not re.match(
-                                        r'(-{3}|/{3}|$)', row[cf + 23]) else None
-                                if hours[1] == 3:
-                                    dp.rr3 = float(row[cf + 10]) * 10 if not re.match(
-                                        r'(-{2}|/{2}|$)', row[cf + 10]) else None
-                                    dp.qsw3 = float(row[cf + 21]) * 10 if not re.match(
-                                        r'(-{3}|/{3}|$)', row[cf + 21]) else None
-                                    dp.gss3 = float(row[cf + 22]) * 10 if not re.match(
-                                        r'(-{3}|/{3}|$)', row[cf + 22]) else None
-                                    dp.qlw3 = float(row[cf + 23]) * 10 if not re.match(
-                                        r'(-{3}|/{3}|$)', row[cf + 23]) else None
-                                db.query(ForecastData).filter(
-                                    ForecastData.station_id == dp.station_id,
-                                    ForecastData.date == dp.date,
-                                    ForecastData.time == dp.time
-                                ).delete()
-                                db.add(dp)
-                                if verbose:
-                                    print('Added forecast for station ' + dp.station_id, end='')
-                                    print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+                                forecast_date = dt_object.date()
+                                forecast_time = dt_object.time()
+                                forecast = db.query(ForecastData).filter(
+                                    ForecastData.station_id == station_id,
+                                    ForecastData.date == forecast_date,
+                                    ForecastData.time == forecast_time
+                                ).first()
+                                if not forecast:
+                                    dp = ForecastData(
+                                        date=forecast_date,
+                                        time=forecast_time,
+                                        tt=float(row[cf + 3]) if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 3]) else None,
+                                        td=float(row[cf + 4]) if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 4]) else None,
+                                        tx=float(row[cf + 5]) if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 5]) else None,
+                                        tn=float(row[cf + 6]) if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 6]) else None,
+                                        dd=int(row[cf + 7]) if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 7]) else None,
+                                        ff=float(row[cf + 8]) * 1.852 if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 8]) else None,
+                                        fx=float(row[cf + 9]) * 1.852 if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 9]) else None,
+                                        ww=int(row[cf + 12]) if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 12]) else None,
+                                        w=int(row[cf + 13]) if not re.match(
+                                            r'([-/])', row[cf + 13]) else None,
+                                        n=int(row[cf + 14]) if not re.match(
+                                            r'([-/])', row[cf + 14]) else None,
+                                        nf=int(row[cf + 15]) if not re.match(
+                                            r'([-/])', row[cf + 15]) else None,
+                                        nl=int(row[cf + 16]) if not re.match(
+                                            r'([-/])', row[cf + 16]) else None,
+                                        nm=int(row[cf + 17]) if not re.match(
+                                            r'([-/])', row[cf + 17]) else None,
+                                        nh=int(row[cf + 18]) if not re.match(
+                                            r'([-/])', row[cf + 18]) else None,
+                                        pppp=float(row[cf + 19]) if not re.match(
+                                            r'(-{4}|/{4}|$)', row[cf + 19]) else None,
+                                        t=float(row[cf + 20]) if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 20]) else None,
+                                        station_id=station_id
+                                    )
+                                    if hours[1] == 1:
+                                        dp.rr1 = float(row[cf + 10]) * 10 if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 10]) else None
+                                        dp.qsw1 = float(row[cf + 21]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 21]) else None
+                                        dp.gss1 = float(row[cf + 22]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 22]) else None
+                                        dp.qlw1 = float(row[cf + 23]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 23]) else None
+                                    if hours[1] == 3:
+                                        dp.rr3 = float(row[cf + 10]) * 10 if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 10]) else None
+                                        dp.qsw3 = float(row[cf + 21]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 21]) else None
+                                        dp.gss3 = float(row[cf + 22]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 22]) else None
+                                        dp.qlw3 = float(row[cf + 23]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 23]) else None
+                                    db.add(dp)
+                                    if verbose:
+                                        print('Added forecast for station ' + dp.station_id, end='')
+                                        print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+                                else:
+                                    forecast.tt = float(row[cf + 3]) if not re.match(
+                                        r'(-{3}|/{3}|$)', row[cf + 3]) else forecast.tt
+                                    forecast.td = float(row[cf + 4]) if not re.match(
+                                        r'(-{3}|/{3}|$)', row[cf + 4]) else forecast.td
+                                    forecast.tx = float(row[cf + 5]) if not re.match(
+                                        r'(-{3}|/{3}|$)', row[cf + 5]) else forecast.tx
+                                    forecast.tn = float(row[cf + 6]) if not re.match(
+                                        r'(-{3}|/{3}|$)', row[cf + 6]) else forecast.tn
+                                    forecast.dd = int(row[cf + 7]) if not re.match(
+                                        r'(-{2}|/{2}|$)', row[cf + 7]) else forecast.dd
+                                    forecast.ff = float(row[cf + 8]) * 1.852 if not re.match(
+                                        r'(-{2}|/{2}|$)', row[cf + 8]) else forecast.ff
+                                    forecast.fx = float(row[cf + 9]) * 1.852 if not re.match(
+                                        r'(-{2}|/{2}|$)', row[cf + 9]) else forecast.fx
+                                    forecast.ww = int(row[cf + 12]) if not re.match(
+                                        r'(-{2}|/{2}|$)', row[cf + 12]) else forecast.ww
+                                    forecast.w = int(row[cf + 13]) if not re.match(
+                                        r'([-/])', row[cf + 13]) else forecast.w
+                                    forecast.n = int(row[cf + 14]) if not re.match(
+                                        r'([-/])', row[cf + 14]) else forecast.n
+                                    forecast.nf = int(row[cf + 15]) if not re.match(
+                                        r'([-/])', row[cf + 15]) else forecast.nf
+                                    forecast.nl = int(row[cf + 16]) if not re.match(
+                                        r'([-/])', row[cf + 16]) else forecast.nl
+                                    forecast.nm = int(row[cf + 17]) if not re.match(
+                                        r'([-/])', row[cf + 17]) else forecast.nm
+                                    forecast.nh = int(row[cf + 18]) if not re.match(
+                                        r'([-/])', row[cf + 18]) else forecast.nh
+                                    forecast.pppp = float(row[cf + 19]) if not re.match(
+                                        r'(-{4}|/{4}|$)', row[cf + 19]) else forecast.pppp
+                                    forecast.t = float(row[cf + 20]) if not re.match(
+                                        r'(-{3}|/{3}|$)', row[cf + 20]) else forecast.t
+                                    
+                                    if hours[1] == 1:
+                                        forecast.rr1 = float(row[cf + 10]) * 10 if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 10]) else forecast.rr1
+                                        forecast.qsw1 = float(row[cf + 21]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 21]) else forecast.qsw1
+                                        forecast.gss1 = float(row[cf + 22]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 22]) else forecast.gss1
+                                        forecast.qlw1 = float(row[cf + 23]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 23]) else forecast.qlw1
+                                    if hours[1] == 3:
+                                        forecast.rr3 = float(row[cf + 10]) * 10 if not re.match(
+                                            r'(-{2}|/{2}|$)', row[cf + 10]) else forecast.rr3
+                                        forecast.qsw3 = float(row[cf + 21]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 21]) else forecast.qsw3
+                                        forecast.gss3 = float(row[cf + 22]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 22]) else forecast.gss3
+                                        forecast.qlw3 = float(row[cf + 23]) * 10 if not re.match(
+                                            r'(-{3}|/{3}|$)', row[cf + 23]) else forecast.qlw3
+                                    if verbose:
+                                        print('Updated forecast for station ' + station_id, end='')
+                                        print(' on ' + forecast_date.__str__() + ' ' + forecast_time.__str__())
                         except ValueError as err_value:
-                            print(row)
                             print(err_value)
-                            exit(1)
+                            continue
                 if verbose:
                     print('\nProcessing file ' + match.string + ' finished.')
                 os.remove(file[0])
