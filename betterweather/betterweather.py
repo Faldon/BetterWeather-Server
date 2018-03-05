@@ -4,9 +4,8 @@ import click
 from flask import Flask, g, jsonify, request
 from datetime import datetime
 from sqlalchemy.schema import CreateTable, MetaData
-from sqlalchemy.orm import joinedload
 from betterweather.db import schema, create_db_connection, get_db_engine
-from betterweather import stations, models
+from betterweather import stations, codes, forecasts, models
 
 
 app = Flask(__name__)
@@ -103,12 +102,8 @@ def weatherstation_import_command(path_to_file, file_format):
 @click.argument('station_id')
 def weatherstation_info_command(station_id):
     """Get weather station info for given id"""
-    db = get_db()
-    station = db.query(models.WeatherStation).filter(models.WeatherStation.id == station_id).first()
-    if not station:
-        print(station)
-        return
-    print(station.to_json())
+    station = stations.get_station(get_db(), station_id)
+    print(station if not station else station.to_json())
 
 
 @app.cli.command('weatherstation_nearest')
@@ -144,11 +139,17 @@ def forecastdata_print_command(station_id, forecast_date):
     except TypeError:
         t = datetime.now().timestamp()
 
-    forecast = __get_forecast(station_id, t)
-    if not forecast:
-        print(forecast)
-        return
-    print(forecast.to_json())
+    full = request.args.get('full', default=False)
+    forecast = forecasts.get_forecast(get_db(), station_id, t, full)
+    print(forecast if not forecast else forecast.to_json())
+
+
+@app.cli.command('weathercode_print')
+@click.argument('key_number')
+def weathercode_print_command(key_number):
+    """Print weather code information"""
+    weathercode = codes.get_weathercode(get_db(), key_number)
+    print(weathercode if not weathercode else weathercode.to_json())
 
 
 @app.cli.command('config_cronjob')
@@ -199,10 +200,8 @@ def config_apache_command(server_name):
 @app.route('/forecast/station/<station_id>/<int:timestamp>')
 def get_forecast_by_station(station_id, timestamp):
     full = request.args.get('full', default=False)
-    forecast = __get_forecast(station_id, timestamp, full)
-    if not forecast:
-        return jsonify(forecast)
-    return jsonify(forecast.to_dict(full))
+    forecast = forecasts.get_forecast(get_db(), station_id, timestamp, full)
+    return jsonify(forecast) if not forecast else jsonify(forecast.to_dict(full))
 
 
 @app.route('/forecast/location/<float:latitude>/<float:longitude>/', defaults={'timestamp': datetime.now().timestamp()})
@@ -219,44 +218,11 @@ def get_station_by_location(latitude, longitude):
 
 @app.route('/station/<station_id>')
 def get_station_by_id(station_id):
-    db = get_db()
-    station = db.query(models.WeatherStation).filter(models.WeatherStation.id == station_id).first()
-    if not station:
-        return jsonify(station)
-    return jsonify(station.to_dict())
+    station = stations.get_station(get_db(), station_id)
+    return jsonify(station) if not station else jsonify(station.to_dict())
 
 
-def __get_forecast(station_id, timestamp, full):
-    """Get weather forecast
-
-    Lookup the closest weather forecast of given station for the given time
-    :param str station_id: The station id
-    :param float timestamp: The time for the forecast as timestamp
-    :param bool full: Join related objects to result
-    :return A weather forecast
-    :rtype betterweather.models.ForecastData or None
-    """
-    d = datetime.fromtimestamp(timestamp)
-    db = get_db()
-    if full:
-        q = db.query(models.ForecastData).options(
-            joinedload(models.ForecastData.station, innerjoin=True)
-        ).filter(
-            models.ForecastData.station_id == station_id,
-            models.ForecastData.date == d.date()
-        )
-    else:
-        q = db.query(models.ForecastData).filter(
-            models.ForecastData.station_id == station_id,
-            models.ForecastData.date == d.date()
-        )
-    forecasts = []
-    for data in q.all():
-        forecasts.append(dict(
-            forecast=data,
-            timediff=abs((d.time().hour * 60 + d.time().minute) - (data.time.hour * 60 + data.time.minute))
-        ))
-    sorted_data = sorted(forecasts, key=lambda k: k['timediff'])
-    if sorted_data:
-        return sorted_data[0]['forecast']
-    return None
+@app.route('/codes/weathercode/<int:key_number>')
+def get_weathercode_by_id(key_number):
+    weathercode = codes.get_weathercode(get_db(), key_number)
+    return jsonify(weathercode) if not weathercode else jsonify(weathercode.to_dict())

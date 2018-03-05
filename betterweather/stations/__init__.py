@@ -6,7 +6,7 @@ from sqlalchemy import exc
 from urllib import request, error
 from datetime import datetime, timedelta
 from math import sin, cos, sqrt, atan2, radians
-from betterweather.models import *
+from betterweather.models import WeatherStation, ForecastData, WeatherCode
 
 R = 6373.0
 
@@ -438,6 +438,17 @@ def update_mosmix_o_underline(root_url, db, verbose):
     except IOError as err_io:
         print('IO Error while retrieving forecast data: ' + err_io.__str__())
         return False
+
+
+def get_station(db, station_id):
+    """
+    Get weather station information
+    :param Session db: A SQLAlchemy database session
+    :param str station_id: The station id
+    :return: Weath station information
+    :rtype: WeatherStation or None
+    """
+    return db.query(WeatherStation).get(station_id)
 
 
 def get_nearest_station(db, latitude, longitude):

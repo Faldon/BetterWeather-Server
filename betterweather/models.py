@@ -21,6 +21,16 @@ class WeatherCode(Base):
     weather_detail_1 = Column(String(255), nullable=True, default=None)
     weather_detail_2 = Column(String(255), nullable=True, default=None)
 
+    def to_json(self):
+        return json.dumps({
+            'id': self.id,
+            'precipitation': self.precipitation,
+            'key_group_outline': self.key_group_outline,
+            'weather_outline': self.weather_outline,
+            'weather_detail_1': self.weather_detail_1,
+            'weather_detail_2': self.weather_detail_2
+        })
+
     def to_dict(self):
         return {
             'id': self.id,
