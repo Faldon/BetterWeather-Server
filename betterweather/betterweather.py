@@ -1,7 +1,7 @@
 import os
 import socket
 import click
-from flask import Flask, g, jsonify, request
+from flask import Flask, g, jsonify, request, render_template
 from datetime import datetime
 from sqlalchemy.schema import CreateTable, MetaData
 from betterweather.db import schema, create_db_connection, get_db_engine
@@ -226,3 +226,8 @@ def get_station_by_id(station_id):
 def get_weathercode_by_id(key_number):
     weathercode = codes.get_weathercode(get_db(), key_number)
     return jsonify(weathercode) if not weathercode else jsonify(weathercode.to_dict())
+
+
+@app.route('/')
+def show_index():
+    return render_template('index.html')

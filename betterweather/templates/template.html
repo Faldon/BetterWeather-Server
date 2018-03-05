@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Better Weather</title>
+        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/lib/bootstrap.min.css') }}">
+        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/lib/typeaheadjs.css') }}">
+    </head>
+    <body>
+        <div class="container-fluid">
+            {% block content %}{% endblock %}
+        </div>
+    </body>
+    <script src="{{ url_for('static', filename='js/lib/jquery-3.3.1.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/typeahead.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/typeahead-address-photon.min.js') }}"></script>
+    {% block javascript %}{% endblock %}
+</html>
