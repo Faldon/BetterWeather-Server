@@ -1,7 +1,7 @@
 import json
 from sqlalchemy import *
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 
 Base = declarative_base()
 
@@ -100,8 +100,8 @@ class ForecastData(Base):
     w = Column(Integer, comment='past weather as WW Code')
     vv = Column(Integer, comment='horizontal visibility in m')
     n = Column(Integer, comment='cloud cover total in Achtel')
-    nf = Column(Integer, comment='cloud cover total in Achtel')
-    nl = Column(Integer, comment='effective cloud cover in Achtel')
+    nf = Column(Integer, comment='effective cloud cover in Achtel')
+    nl = Column(Integer, comment='cloud cover of low level clouds in Achtel')
     nm = Column(Integer, comment='cloud cover of medium level clouds in Achtel')
     nh = Column(Integer, comment='cloud cover of high level clouds in Achtel')
     pppp = Column(Float, comment='pressure reduced to mean sea level in hPa')
@@ -114,6 +114,36 @@ class ForecastData(Base):
     qlw1 = Column(Float, comment='long wave radiation last hour in kJ/qm')
     qlw3 = Column(Float, comment='long wave radiation last 3 hours in kJ/qm')
     station_id = Column(String(5), ForeignKey('weather_stations.id'))
+
+    TTT = synonym(tt)
+    T5cm = synonym(tg)
+    Td = synonym(td)
+    TX = synonym(tx)
+    TN = synonym(tn)
+    DD = synonym(dd)
+    FF = synonym(ff)
+    FX1 = synonym(fx)
+    RR1c = synonym(rr1)
+    RR3c = synonym(rr3)
+    WW = synonym(ww)
+    W1W2 = synonym(w)
+    N = synonym(n)
+    Neff = synonym(nf)
+    Nl = synonym(nl)
+    Nm = synonym(nm)
+    Nh = synonym(nh)
+    PPPP = synonym(pppp)
+    RadS3 = synonym(qsw3)
+    Rad1h = synonym(gss1)
+    RadL3 = synonym(qlw3)
+    VV = synonym(vv)
+    SunD1 = synonym(ss1)
+    FXh25 = synonym(fx6)
+    FXh40 = synonym(fx9)
+    FXh55 = synonym(fx11)
+    R602 = synonym(rrp6)
+    Rh00 = synonym(rrp12)
+    Rd02 = synonym(rrp24)
 
     station = relationship("WeatherStation", back_populates="forecast_data")
     __table_args__ = (UniqueConstraint('station_id', 'date', 'time', name='uq_forecast_data.station_id_date_time'),)

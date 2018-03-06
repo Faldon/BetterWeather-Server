@@ -2,6 +2,8 @@ import csv
 import re
 import os
 import bz2
+import zipfile
+from xml.etree import ElementTree
 from sqlalchemy import exc
 from urllib import request, error
 from datetime import datetime, timedelta
@@ -9,6 +11,13 @@ from math import sin, cos, sqrt, atan2, radians
 from betterweather.models import WeatherStation, ForecastData, WeatherCode
 
 R = 6373.0
+KML_NS = {
+    'kml': "http://www.opengis.net/kml/2.2",
+    'dwd': "https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd",
+    'gx': "http://www.google.com/kml/ext/2.2",
+    'xal': "urn:oasis:names:tc:ciq:xsdschema:xAL:2.0",
+    'atom': "http://www.w3.org/2005/Atom"
+}
 
 
 def import_stations_from_sql(path_to_file, db):
@@ -437,6 +446,109 @@ def update_mosmix_o_underline(root_url, db, verbose):
         return False
     except IOError as err_io:
         print('IO Error while retrieving forecast data: ' + err_io.__str__())
+        return False
+
+
+def update_mosmix_kml(root_url, db, verbose):
+    url = root_url + 'MOSMIX_S_LATEST_240.kmz'
+    if verbose:
+        print('Retrieving forecast data from ' + url)
+    try:
+        db.begin(subtransactions=True)
+        file = request.urlretrieve(url)
+        zip_handle = zipfile.ZipFile(file[0])
+        file_name = zip_handle.filelist[0].filename
+        zip_handle.extractall(path='/tmp/')
+        forecast_dates = []
+        forecast_data = dict()
+        kml_root = ElementTree.parse('/tmp/' + file_name)
+        for timestep in kml_root.findall('.//dwd:TimeStep', KML_NS):
+            forecast_dates.append(datetime.strptime(timestep.text, '%Y-%m-%dT%H:%M:%S.000Z'))
+        for placemark in kml_root.findall('.//kml:Placemark', KML_NS):
+            print(placemark)
+            station_id = placemark.find('./kml:name', KML_NS).text
+            station_name = placemark.find('./kml:description', KML_NS).text
+            coords = placemark.find('./kml:Point/kml:coordinates', KML_NS).text.split(',')
+            station_longitude = coords[0]
+            station_latitude = coords[1]
+            station_amsl = coords[2]
+            print(station_id, station_name, station_longitude, station_latitude, station_amsl)
+            data = db.query(WeatherStation).get(station_id)
+            if not data:
+                weather_station = WeatherStation(
+                    id=station_id,
+                    name=station_name,
+                    latitude=station_latitude,
+                    longitude=station_longitude,
+                    amsl=station_amsl
+                )
+                db.add(weather_station)
+                if verbose:
+                    print('New station ' + station_id + ' added.')
+            for data in placemark.findall('.//dwd:Forecast', KML_NS):
+                p = data.get('{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
+                forecast_data.update(p=data.find('./dwd:value', KML_NS).text.split())
+            for key in forecast_data.keys():
+                if key[0:1] == 'T':
+                    values = forecast_data.get(key)
+                    for i in range(0, len(values)):
+                        forecast_data[key][i] = float(values[i]) * 1.852001 if values[i] != '-' else None
+                if key == 'FF' or key == 'FX1':
+                    values = forecast_data.get(key)
+                    for i in range(0, len(values)):
+                        forecast_data[key][i] = float(values[i]) * (18 / 5) if values[i] != '-' else None
+                if key[0:2] == 'RR':
+                    values = forecast_data.get(key)
+                    for i in range(0, len(values)):
+                        forecast_data[key][i] = float(values[i]) * (18 / 5) if values[i] != '-' else None
+                if key == 'PPPP':
+                    values = forecast_data.get(key)
+                    for i in range(0, len(values)):
+                        forecast_data[key][i] = float(values[i]) / 100 if values[i] != '-' else None
+            for i in range(0, len(forecast_dates)):
+                forecast = db.query(ForecastData).filter(
+                    ForecastData.station_id == station_id,
+                    ForecastData.date == forecast_dates[i].date(),
+                    ForecastData.time == forecast_dates[i].time()
+                ).first()
+                if not forecast:
+                    dp = ForecastData(
+                        date=forecast_dates[i].date(),
+                        time=forecast_dates[i].time(),
+                        station_id=station_id
+                    )
+                    for key in forecast_data.keys():
+                        if getattr(dp, key, None):
+                            dp[key] = forecast_data[key][i] if forecast_data[key][i] != '-' else None
+                    db.add(dp)
+                    if verbose:
+                        print('Added forecast for station ' + dp.station_id, end='')
+                        print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+                else:
+                    for key in forecast_data.keys():
+                        if getattr(forecast, key, None):
+                            forecast[key] = forecast_data[key][i] if forecast_data[key][i] != '-' else None
+                    if verbose:
+                        print('Updated forecast for station ' + station_id, end='')
+                        print(' on ' + forecast_dates[i].date().__str__() + ' ' + forecast_dates[i].time().__str__())
+        os.remove(file[0])
+        os.remove('/tmp/' + file_name)
+        if verbose:
+            print('Processing of ' + file_name + ' finished.')
+        db.commit()
+        return True
+    except exc.DBAPIError as err_dbapi:
+        db.rollback()
+        print('\nDB Error: ' + err_dbapi.__str__())
+        return False
+    except error.HTTPError as err_http:
+        print('HTTP Error while retrieving forecast data: ' + err_http.__str__())
+        return False
+    except IOError as err_io:
+        print('IO Error while retrieving forecast data: ' + err_io.__str__())
+        return False
+    except error.ContentTooShortError as err_content_to_short:
+        print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
         return False
 
 

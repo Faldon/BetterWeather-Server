@@ -9,3 +9,4 @@ DATABASE = dict(
 
 FORECASTS_URL_CSV = 'https://opendata.dwd.de/weather/local_forecasts/poi/'
 FORECASTS_URL_ASCII = 'https://opendata.dwd.de/weather/local_forecasts/mos/'
+FORECASTS_URL_KML = 'https://opendata.dwd.de/weather/local_forecasts/mos/'
