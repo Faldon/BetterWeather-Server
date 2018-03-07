@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import exc
 
 
@@ -30,7 +30,7 @@ def create_db_connection(engine):
     :param sqlalchemy.engine.Engine engine: The sqlalchem engine to use
     :return sqlachemy.orm.session.Session
     """
-    Session = sessionmaker(bind=engine, autocommit=True)
+    Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
     session = Session()
     return session
 
