@@ -3,12 +3,14 @@ import re
 import os
 import bz2
 import zipfile
+import threading
 from xml.etree import ElementTree
 from sqlalchemy import exc
 from urllib import request, error
 from datetime import datetime, timedelta
 from math import sin, cos, sqrt, atan2, radians
 from betterweather.models import WeatherStation, ForecastData
+from betterweather import betterweather
 
 R = 6373.0
 KML_NS = {
@@ -20,31 +22,40 @@ KML_NS = {
 }
 
 
-def import_stations_from_sql(path_to_file, db):
-    db.begin(subtransactions=True)
+def import_stations_from_sql(path_to_file, db_session):
+    """Import station data from sql
+
+    :param str path_to_file: The sql file
+    :param sqlachemy.orm.session.Session db_session: A SQLAlchemy database session
+    :return True on success, False on failure
+    :rtype: bool
+    """
+    db_session.begin(subtransactions=True)
     try:
         for query in open(path_to_file, 'r'):
-            db.execute(query)
-        db.commit()
+            db_session.execute(query)
+        db_session.commit()
         return True
     except exc.DBAPIError as err_dbapi:
         print(err_dbapi)
-        db.rollback()
+        db_session.rollback()
         return False
 
 
-def import_stations_from_csv(path_to_file, db):
-    """
-    Import station data from csv
+def import_stations_from_csv(path_to_file, db_session):
+    """Import station data from csv
+
     :param str path_to_file: The csv file
-    :param sqlachemy.orm.session.Session db: A SQLAlchemy database session
+    :param sqlachemy.orm.session.Session db_session: A SQLAlchemy database session
+    :return True on success, False on failure
+    :rtype: bool
     """
     try:
         print('Importing station data into database.')
         with open(path_to_file, 'r') as station_list:
             csv_reader = csv.reader(station_list, delimiter=',', quotechar='"')
             try:
-                db.begin(subtransactions=True)
+                db_session.begin(subtransactions=True)
                 for row in csv_reader:
                     station_id = None
                     station_name = None
@@ -71,12 +82,12 @@ def import_stations_from_csv(path_to_file, db):
                             longitude=float(station_longitude),
                             amsl=station_amsl
                         )
-                        db.add(station)
+                        db_session.add(station)
                         print('.', end='')
-                db.commit()
+                db_session.commit()
                 print('\nData import completed successfully.')
             except exc.IntegrityError as err_integrity:
-                db.rollback()
+                db_session.rollback()
                 print('\nAn error occured during operation: ' + err_integrity.__str__())
                 print('Data import operation aborted.')
                 return False
@@ -93,13 +104,14 @@ def import_stations_from_csv(path_to_file, db):
     return True
 
 
-def update_mosmix_poi(root_url, db, verbose):
-    """
-    Update weather forecast from mosmix poi csv
+def update_mosmix_poi(root_url, db_session, verbose):
+    """Update weather forecast from mosmix poi csv
+
     :param str root_url: The link to the directory containing the files
-    :param sqlachemy.orm.session.Session db: A SQLAlchemy database session
+    :param sqlachemy.orm.session.Session db_session: A SQLAlchemy database session
     :param bool verbose: Print verbose output
-    :return:
+    :return: True on success, False on error
+    :rtype: bool
     """
     station_id = ''
     try:
@@ -107,12 +119,13 @@ def update_mosmix_poi(root_url, db, verbose):
             print('Retrieving forecast data from ' + root_url)
         root = request.urlopen(root_url)
         links = re.findall(r"(?:href=['\"])([:/.A-z?<_&\s=>0-9;-]+)", root.read().decode('utf-8'))
-        db.begin(subtransactions=True)
+        db_session.autoflush = False
+        db_session.begin(subtransactions=True)
         for link in links:
             station_id = link.__str__()[:5].replace("_", "")
             if verbose:
                 print("Processing station " + station_id)
-            data = db.query(WeatherStation).get(station_id)
+            data = db_session.query(WeatherStation).get(station_id)
             if not data:
                 continue
             url = root_url + link
@@ -134,7 +147,7 @@ def update_mosmix_poi(root_url, db, verbose):
                     try:
                         forecast_date = dt_object.date()
                         forecast_time = datetime.strptime(row[1], '%H:%M').time()
-                        dp = db.query(ForecastData).filter(
+                        dp = db_session.query(ForecastData).filter(
                             ForecastData.station_id == station_id,
                             ForecastData.date == forecast_date,
                             ForecastData.time == forecast_time
@@ -145,7 +158,7 @@ def update_mosmix_poi(root_url, db, verbose):
                                 time=forecast_time,
                                 station_id=station_id
                             )
-                            db.add(dp)
+                            db_session.add(dp)
                         dp.tt = float(row[2]) if row[2] != "---" else dp.tt
                         dp.td = float(row[3]) if row[3] != "---" else dp.td
                         dp.tx = float(row[4]) if row[4] != "---" else dp.tx
@@ -189,10 +202,10 @@ def update_mosmix_poi(root_url, db, verbose):
                 if verbose:
                     print('\nProcessing data for station ' + station_id + ' finished.')
             os.remove(file[0])
-        db.commit()
+        db_session.commit()
         return True
     except exc.DBAPIError as err_dbapi:
-        db.rollback()
+        db_session.rollback()
         print('\nError while processing data for station ' + station_id + ': ' + err_dbapi.__str__())
         return False
     except error.HTTPError as err_http:
@@ -203,20 +216,22 @@ def update_mosmix_poi(root_url, db, verbose):
         return False
 
 
-def update_mosmix_o_underline(root_url, db, verbose):
+def update_mosmix_o_underline(root_url, db_session, verbose):
+    """Update weather forecast from mosmix o_underline
+
+    :param str root_url: The link to the directory containing the files
+    :param sqlachemy.orm.session.Session db_session: A SQLAlchemy database session
+    :param bool verbose: Print verbose output
+    :return True on success, False on failure
+    :rtype: bool
     """
-        Update weather forecast from mosmix o_underline
-        :param str root_url: The link to the directory containing the files
-        :param sqlachemy.orm.session.Session db: A SQLAlchemy database session
-        :param bool verbose: Print verbose output
-        :return:
-        """
     try:
         if verbose:
             print('Retrieving forecast data from ' + root_url)
         root = request.urlopen(root_url)
         links = re.findall(r"(?:href=['\"])([:/.A-z?<_&\s=>0-9;-]+)", root.read().decode('utf-8'))
-        db.begin(subtransactions=True)
+        db_session.autoflush = False
+        db_session.begin(subtransactions=True)
         for link in links:
             if re.search(r'latest', link):
                 match = re.search(r'(\d{3}_\d)', link)
@@ -236,7 +251,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
                     weather_forecast_data = [e for e in data if not re.search(r'\*', e)]
                     for row in station_data:
                         station_id = row[0:5].strip()
-                        data = db.query(WeatherStation).get(station_id)
+                        data = db_session.query(WeatherStation).get(station_id)
                         if not data:
                             station_name = ''.join(row)[8:23].strip()
                             props = ''.join(row)[24:].split()
@@ -252,7 +267,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
                                 longitude=station_longitude,
                                 amsl=station_amsl
                             )
-                            db.add(weather_station)
+                            db_session.add(weather_station)
                             if verbose:
                                 print('New station ' + station_id + ' added.')
                     csv_reader = csv.reader(weather_forecast_data, delimiter=" ")
@@ -272,7 +287,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
                                 dt_object = creation_time + timedelta(hours=int(row[cf + 1]))
                                 forecast_date = dt_object.date()
                                 forecast_time = dt_object.time()
-                                dp = db.query(ForecastData).filter(
+                                dp = db_session.query(ForecastData).filter(
                                     ForecastData.station_id == station_id,
                                     ForecastData.date == forecast_date,
                                     ForecastData.time == forecast_time
@@ -283,7 +298,7 @@ def update_mosmix_o_underline(root_url, db, verbose):
                                         time=forecast_time,
                                         station_id=station_id
                                     )
-                                    db.add(dp)
+                                    db_session.add(dp)
                                 dp.tt = float(row[cf + 3]) if not re.match(
                                     r'(-{3}|/{3}|$)', row[cf + 3]) else dp.tt
                                 dp.td = float(row[cf + 4]) if not re.match(
@@ -344,10 +359,10 @@ def update_mosmix_o_underline(root_url, db, verbose):
                 if verbose:
                     print('\nProcessing file ' + match.string + ' finished.')
                 os.remove(file[0])
-        db.commit()
+        db_session.commit()
         return True
     except exc.DBAPIError as err_dbapi:
-        db.rollback()
+        db_session.rollback()
         print('\nDB Error: ' + err_dbapi.__str__())
         return False
     except error.HTTPError as err_http:
@@ -358,12 +373,23 @@ def update_mosmix_o_underline(root_url, db, verbose):
         return False
 
 
-def update_mosmix_kml(root_url, db, verbose):
+def update_mosmix_kml(root_url, db_session, verbose):
+    """Update weather forecast from mosmix kml
+
+    :param str root_url: The link to the directory containing the file
+    :param sqlachemy.orm.session.Session db_session: A SQLAlchemy database session
+    :param bool verbose: Print verbose output
+    :return True on success, False on failure
+    :rtype: bool
+    """
+    start = datetime.now()
+    print(start)
     url = root_url + 'MOSMIX_S_LATEST_240.kmz'
     if verbose:
         print('Retrieving forecast data from ' + url)
     try:
-        db.begin(subtransactions=True)
+        # db_session.autoflush = False
+        # db_session.begin(subtransactions=True)
         file = request.urlretrieve(url)
         zip_handle = zipfile.ZipFile(file[0])
         file_name = zip_handle.filelist[0].filename
@@ -373,14 +399,203 @@ def update_mosmix_kml(root_url, db, verbose):
         kml_root = ElementTree.parse('/tmp/' + file_name)
         for timestep in kml_root.findall('.//dwd:TimeStep', KML_NS):
             forecast_dates.append(datetime.strptime(timestep.text, '%Y-%m-%dT%H:%M:%S.000Z'))
-        for placemark in kml_root.findall('.//kml:Placemark', KML_NS):
+        placemarks = kml_root.findall('.//kml:Placemark', KML_NS)
+        chunk_size = int(len(placemarks) / 8)
+        for partition in ([placemarks[i:i+chunk_size] for i in range(0, len(placemarks), chunk_size)]):
+            local_thread = threading.Thread(target=__process_kml, args=(forecast_dates, partition, verbose))
+            local_thread.start()
+        for t in threading.enumerate():
+            if not t == threading.current_thread():
+                t.join()
+
+        # for placemark in kml_root.findall('.//kml:Placemark', KML_NS):
+        #     station_id = placemark.find('./kml:name', KML_NS).text
+        #     station_name = placemark.find('./kml:description', KML_NS).text
+        #     coords = placemark.find('./kml:Point/kml:coordinates', KML_NS).text.split(',')
+        #     station_longitude = float(coords[0])
+        #     station_latitude = float(coords[1])
+        #     station_amsl = int(float(coords[2]))
+        #     data = db_session.query(WeatherStation).get(station_id)
+        #     if not data:
+        #         weather_station = WeatherStation(
+        #             id=station_id,
+        #             name=station_name,
+        #             latitude=station_latitude,
+        #             longitude=station_longitude,
+        #             amsl=station_amsl
+        #         )
+        #         db_session.add(weather_station)
+        #         if verbose:
+        #             print('New station ' + station_id + ' added.')
+        #     for data in placemark.findall('.//dwd:Forecast', KML_NS):
+        #         key = data.get('{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
+        #         forecast_data[key] = data.find('./dwd:value', KML_NS).text.split()
+        #     for i in range(0, len(forecast_dates)):
+        #         dp = db_session.query(ForecastData).filter(
+        #             ForecastData.station_id == station_id,
+        #             ForecastData.date == forecast_dates[i].date(),
+        #             ForecastData.time == forecast_dates[i].time()
+        #         ).first()
+        #         if not dp:
+        #             dp = ForecastData(
+        #                 date=forecast_dates[i].date(),
+        #                 time=forecast_dates[i].time(),
+        #                 station_id=station_id
+        #             )
+        #             db_session.add(dp)
+        #         for key in forecast_data.keys():
+        #             if key == 'TTT':
+        #                 dp.tt = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+        #             if key == 'T5cm':
+        #                 dp.tg = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+        #             if key == 'Td':
+        #                 dp.td = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+        #             if key == 'TX':
+        #                 dp.tx = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+        #             if key == 'TN':
+        #                 dp.tn = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+        #             if key == 'DD':
+        #                 dp.dd = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'FF':
+        #                 dp.ff = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+        #             if key == 'FX1':
+        #                 dp.fx = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+        #             if key == 'RR1c':
+        #                 dp.rr1 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+        #             if key == 'RR3c':
+        #                 dp.rr3 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+        #             if key == 'WW':
+        #                 dp.ww = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'W1W2':
+        #                 dp.w = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'N':
+        #                 dp.n = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'Neff':
+        #                 dp.nf = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'Nl':
+        #                 dp.nl = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'Nm':
+        #                 dp.nm = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'Nh':
+        #                 dp.nh = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'PPPP':
+        #                 dp.pppp = float(forecast_data[key][i]) / 100 if forecast_data[key][i] != '-' else None
+        #             if key == 'RadS3':
+        #                 dp.qsw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+        #             if key == 'Rad1h':
+        #                 dp.gss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+        #             if key == 'RadL3':
+        #                 dp.qlw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+        #             if key == 'VV':
+        #                 dp.vv = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'SunD1':
+        #                 dp.ss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+        #             if key == 'FXh25':
+        #                 dp.fx6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'FXh40':
+        #                 dp.fx9 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'FXh55':
+        #                 dp.fx11 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'R602':
+        #                 dp.rrp6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'Rh00':
+        #                 dp.rrp12 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if key == 'Rd02':
+        #                 dp.rrp24 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+        #             if verbose:
+        #                 print('Added forecast for station ' + dp.station_id, end='')
+        #                 print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+        os.remove(file[0])
+        os.remove('/tmp/' + file_name)
+        end = datetime.now()
+        print(end)
+        print(end-start)
+        if verbose:
+            print('Processing of ' + file_name + ' finished.')
+        # db_session.commit()
+        return True
+    # except exc.DBAPIError as err_dbapi:
+    #     db_session.rollback()
+    #     print('\nDB Error: ' + err_dbapi.__str__())
+    #     return False
+    except error.HTTPError as err_http:
+        # db_session.rollback()
+        print('HTTP Error while retrieving forecast data: ' + err_http.__str__())
+        return False
+    except IOError as err_io:
+        # db_session.rollback()
+        print('IO Error while retrieving forecast data: ' + err_io.__str__())
+        return False
+    except error.ContentTooShortError as err_content_to_short:
+        # db_session.rollback()
+        print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
+        return False
+
+
+def get_station(db, station_id):
+    """Get weather station information
+
+    :param Session db: A SQLAlchemy database session
+    :param str station_id: The station id
+    :return: Weath station information
+    :rtype: WeatherStation or None
+    """
+    return db.query(WeatherStation).get(station_id)
+
+
+def get_nearest_station(db, latitude, longitude):
+    src = dict(latitude=latitude, longitude=longitude)
+    q = db.query(WeatherStation)
+    distances = []
+    for weather_station in q.all()[:]:
+        dst = dict(latitude=weather_station.latitude, longitude=weather_station.longitude)
+        distance = __get_distance(src, dst)
+        distances.append(dict(station=weather_station, distance=distance))
+    return sorted(distances, key=lambda k: k['distance'])[0]['station']
+
+
+def __get_distance(src, dst):
+    """Calculate the distance between two points
+
+    :param Dict src: The source point
+    :param Dict dst: The destination point
+    :return: float The distance in kilometers
+    """
+    src_latitude = radians(float(src['latitude']))
+    src_longitude = radians(float(src['longitude']))
+    dst_latitude = radians(dst['latitude'])
+    dst_longitude = radians(dst['longitude'])
+
+    dlon = dst_longitude - src_longitude
+    dlat = dst_latitude - src_latitude
+    a = (sin(dlat / 2)) ** 2 + cos(src_latitude) * cos(dst_latitude) * (sin(dlon / 2)) ** 2
+    c = 2 * atan2(sqrt(a), sqrt((1 - a)))
+    distance = R * c
+    return distance
+
+
+def __process_kml(dates, placemarks, verbose):
+    """Process forecasts for writing to the database
+
+    :param sqlalchem.orm.session.Session db_session: A SQLAlchemy database session
+    :param dates: A list of forecast dates
+    :param placemarks: A list of placemarks
+    :param verbose: Print verbose output
+    :return:
+    """
+    forecast_data = dict()
+    db_session = betterweather.connect_db()
+    db_session.autoflush = False
+    db_session.begin(subtransactions=True)
+    try:
+        for placemark in placemarks:
             station_id = placemark.find('./kml:name', KML_NS).text
             station_name = placemark.find('./kml:description', KML_NS).text
             coords = placemark.find('./kml:Point/kml:coordinates', KML_NS).text.split(',')
             station_longitude = float(coords[0])
             station_latitude = float(coords[1])
             station_amsl = int(float(coords[2]))
-            data = db.query(WeatherStation).get(station_id)
+            data = db_session.query(WeatherStation).get(station_id)
             if not data:
                 weather_station = WeatherStation(
                     id=station_id,
@@ -389,25 +604,25 @@ def update_mosmix_kml(root_url, db, verbose):
                     longitude=station_longitude,
                     amsl=station_amsl
                 )
-                db.add(weather_station)
+                db_session.add(weather_station)
                 if verbose:
                     print('New station ' + station_id + ' added.')
             for data in placemark.findall('.//dwd:Forecast', KML_NS):
                 key = data.get('{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
                 forecast_data[key] = data.find('./dwd:value', KML_NS).text.split()
-            for i in range(0, len(forecast_dates)):
-                dp = db.query(ForecastData).filter(
+            for i in range(0, len(dates)):
+                dp = db_session.query(ForecastData).filter(
                     ForecastData.station_id == station_id,
-                    ForecastData.date == forecast_dates[i].date(),
-                    ForecastData.time == forecast_dates[i].time()
+                    ForecastData.date == dates[i].date(),
+                    ForecastData.time == dates[i].time()
                 ).first()
                 if not dp:
                     dp = ForecastData(
-                        date=forecast_dates[i].date(),
-                        time=forecast_dates[i].time(),
+                        date=dates[i].date(),
+                        time=dates[i].time(),
                         station_id=station_id
                     )
-                    db.add(dp)
+                    db_session.add(dp)
                 for key in forecast_data.keys():
                     if key == 'TTT':
                         dp.tt = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
@@ -470,67 +685,9 @@ def update_mosmix_kml(root_url, db, verbose):
                     if verbose:
                         print('Added forecast for station ' + dp.station_id, end='')
                         print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
-        os.remove(file[0])
-        os.remove('/tmp/' + file_name)
-        if verbose:
-            print('Processing of ' + file_name + ' finished.')
-        db.commit()
+        db_session.commit()
         return True
     except exc.DBAPIError as err_dbapi:
-        db.rollback()
+        db_session.rollback()
         print('\nDB Error: ' + err_dbapi.__str__())
         return False
-    except error.HTTPError as err_http:
-        db.rollback()
-        print('HTTP Error while retrieving forecast data: ' + err_http.__str__())
-        return False
-    except IOError as err_io:
-        db.rollback()
-        print('IO Error while retrieving forecast data: ' + err_io.__str__())
-        return False
-    except error.ContentTooShortError as err_content_to_short:
-        db.rollback()
-        print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
-        return False
-
-
-def get_station(db, station_id):
-    """
-    Get weather station information
-    :param Session db: A SQLAlchemy database session
-    :param str station_id: The station id
-    :return: Weath station information
-    :rtype: WeatherStation or None
-    """
-    return db.query(WeatherStation).get(station_id)
-
-
-def get_nearest_station(db, latitude, longitude):
-    src = dict(latitude=latitude, longitude=longitude)
-    q = db.query(WeatherStation)
-    distances = []
-    for weather_station in q.all()[:]:
-        dst = dict(latitude=weather_station.latitude, longitude=weather_station.longitude)
-        distance = __get_distance(src, dst)
-        distances.append(dict(station=weather_station, distance=distance))
-    return sorted(distances, key=lambda k: k['distance'])[0]['station']
-
-
-def __get_distance(src, dst):
-    """
-    Calculate the distance between two points
-    :param Dict src: The source point
-    :param Dict dst: The destination point
-    :return: float The distance in kilometers
-    """
-    src_latitude = radians(float(src['latitude']))
-    src_longitude = radians(float(src['longitude']))
-    dst_latitude = radians(dst['latitude'])
-    dst_longitude = radians(dst['longitude'])
-
-    dlon = dst_longitude - src_longitude
-    dlat = dst_latitude - src_latitude
-    a = (sin(dlat / 2)) ** 2 + cos(src_latitude) * cos(dst_latitude) * (sin(dlon / 2)) ** 2
-    c = 2 * atan2(sqrt(a), sqrt((1 - a)))
-    distance = R * c
-    return distance
