@@ -4,6 +4,7 @@ import os
 import bz2
 import zipfile
 import threading
+import multiprocessing
 from xml.etree import ElementTree
 from sqlalchemy import exc
 from urllib import request, error
@@ -401,12 +402,19 @@ def update_mosmix_kml(root_url, db_session, verbose):
             forecast_dates.append(datetime.strptime(timestep.text, '%Y-%m-%dT%H:%M:%S.000Z'))
         placemarks = kml_root.findall('.//kml:Placemark', KML_NS)
         chunk_size = int(len(placemarks) / 8)
+        processes = []
         for partition in ([placemarks[i:i+chunk_size] for i in range(0, len(placemarks), chunk_size)]):
-            local_thread = threading.Thread(target=__process_kml, args=(forecast_dates, partition, verbose))
-            local_thread.start()
-        for t in threading.enumerate():
-            if not t == threading.current_thread():
-                t.join()
+            # local_thread = threading.Thread(target=__process_kml, args=(forecast_dates, partition, verbose))
+            # local_thread.start()
+            local_process = multiprocessing.Process(target=__process_kml, args=(forecast_dates, partition, verbose))
+            local_process.start()
+            processes.append(local_process)
+        # for t in threading.enumerate():
+        #     if not t == threading.current_thread():
+        #         t.join()
+        for p in processes:
+            if not p == multiprocessing.current_process():
+                p.join()
 
         # for placemark in kml_root.findall('.//kml:Placemark', KML_NS):
         #     station_id = placemark.find('./kml:name', KML_NS).text
@@ -583,111 +591,112 @@ def __process_kml(dates, placemarks, verbose):
     :param verbose: Print verbose output
     :return:
     """
-    forecast_data = dict()
-    db_session = betterweather.connect_db()
-    db_session.autoflush = False
-    db_session.begin(subtransactions=True)
-    try:
-        for placemark in placemarks:
-            station_id = placemark.find('./kml:name', KML_NS).text
-            station_name = placemark.find('./kml:description', KML_NS).text
-            coords = placemark.find('./kml:Point/kml:coordinates', KML_NS).text.split(',')
-            station_longitude = float(coords[0])
-            station_latitude = float(coords[1])
-            station_amsl = int(float(coords[2]))
-            data = db_session.query(WeatherStation).get(station_id)
-            if not data:
-                weather_station = WeatherStation(
-                    id=station_id,
-                    name=station_name,
-                    latitude=station_latitude,
-                    longitude=station_longitude,
-                    amsl=station_amsl
-                )
-                db_session.add(weather_station)
-                if verbose:
-                    print('New station ' + station_id + ' added.')
-            for data in placemark.findall('.//dwd:Forecast', KML_NS):
-                key = data.get('{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
-                forecast_data[key] = data.find('./dwd:value', KML_NS).text.split()
-            for i in range(0, len(dates)):
-                dp = db_session.query(ForecastData).filter(
-                    ForecastData.station_id == station_id,
-                    ForecastData.date == dates[i].date(),
-                    ForecastData.time == dates[i].time()
-                ).first()
-                if not dp:
-                    dp = ForecastData(
-                        date=dates[i].date(),
-                        time=dates[i].time(),
-                        station_id=station_id
+    with betterweather.app.app_context():
+        forecast_data = dict()
+        db_session = betterweather.connect_db()
+        db_session.autoflush = False
+        db_session.begin(subtransactions=True)
+        try:
+            for placemark in placemarks:
+                station_id = placemark.find('./kml:name', KML_NS).text
+                station_name = placemark.find('./kml:description', KML_NS).text
+                coords = placemark.find('./kml:Point/kml:coordinates', KML_NS).text.split(',')
+                station_longitude = float(coords[0])
+                station_latitude = float(coords[1])
+                station_amsl = int(float(coords[2]))
+                data = db_session.query(WeatherStation).get(station_id)
+                if not data:
+                    weather_station = WeatherStation(
+                        id=station_id,
+                        name=station_name,
+                        latitude=station_latitude,
+                        longitude=station_longitude,
+                        amsl=station_amsl
                     )
-                    db_session.add(dp)
-                for key in forecast_data.keys():
-                    if key == 'TTT':
-                        dp.tt = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                    if key == 'T5cm':
-                        dp.tg = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                    if key == 'Td':
-                        dp.td = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                    if key == 'TX':
-                        dp.tx = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                    if key == 'TN':
-                        dp.tn = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                    if key == 'DD':
-                        dp.dd = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'FF':
-                        dp.ff = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                    if key == 'FX1':
-                        dp.fx = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                    if key == 'RR1c':
-                        dp.rr1 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                    if key == 'RR3c':
-                        dp.rr3 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                    if key == 'WW':
-                        dp.ww = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'W1W2':
-                        dp.w = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'N':
-                        dp.n = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'Neff':
-                        dp.nf = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'Nl':
-                        dp.nl = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'Nm':
-                        dp.nm = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'Nh':
-                        dp.nh = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'PPPP':
-                        dp.pppp = float(forecast_data[key][i]) / 100 if forecast_data[key][i] != '-' else None
-                    if key == 'RadS3':
-                        dp.qsw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                    if key == 'Rad1h':
-                        dp.gss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                    if key == 'RadL3':
-                        dp.qlw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                    if key == 'VV':
-                        dp.vv = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'SunD1':
-                        dp.ss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                    if key == 'FXh25':
-                        dp.fx6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'FXh40':
-                        dp.fx9 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'FXh55':
-                        dp.fx11 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'R602':
-                        dp.rrp6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'Rh00':
-                        dp.rrp12 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                    if key == 'Rd02':
-                        dp.rrp24 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                    db_session.add(weather_station)
                     if verbose:
-                        print('Added forecast for station ' + dp.station_id, end='')
-                        print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
-        db_session.commit()
-        return True
-    except exc.DBAPIError as err_dbapi:
-        db_session.rollback()
-        print('\nDB Error: ' + err_dbapi.__str__())
-        return False
+                        print('New station ' + station_id + ' added.')
+                for data in placemark.findall('.//dwd:Forecast', KML_NS):
+                    key = data.get('{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
+                    forecast_data[key] = data.find('./dwd:value', KML_NS).text.split()
+                for i in range(0, len(dates)):
+                    dp = db_session.query(ForecastData).filter(
+                        ForecastData.station_id == station_id,
+                        ForecastData.date == dates[i].date(),
+                        ForecastData.time == dates[i].time()
+                    ).first()
+                    if not dp:
+                        dp = ForecastData(
+                            date=dates[i].date(),
+                            time=dates[i].time(),
+                            station_id=station_id
+                        )
+                        db_session.add(dp)
+                    for key in forecast_data.keys():
+                        if key == 'TTT':
+                            dp.tt = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+                        if key == 'T5cm':
+                            dp.tg = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+                        if key == 'Td':
+                            dp.td = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+                        if key == 'TX':
+                            dp.tx = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+                        if key == 'TN':
+                            dp.tn = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
+                        if key == 'DD':
+                            dp.dd = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'FF':
+                            dp.ff = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+                        if key == 'FX1':
+                            dp.fx = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+                        if key == 'RR1c':
+                            dp.rr1 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+                        if key == 'RR3c':
+                            dp.rr3 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
+                        if key == 'WW':
+                            dp.ww = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'W1W2':
+                            dp.w = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'N':
+                            dp.n = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'Neff':
+                            dp.nf = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'Nl':
+                            dp.nl = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'Nm':
+                            dp.nm = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'Nh':
+                            dp.nh = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'PPPP':
+                            dp.pppp = float(forecast_data[key][i]) / 100 if forecast_data[key][i] != '-' else None
+                        if key == 'RadS3':
+                            dp.qsw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+                        if key == 'Rad1h':
+                            dp.gss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+                        if key == 'RadL3':
+                            dp.qlw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+                        if key == 'VV':
+                            dp.vv = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'SunD1':
+                            dp.ss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
+                        if key == 'FXh25':
+                            dp.fx6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'FXh40':
+                            dp.fx9 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'FXh55':
+                            dp.fx11 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'R602':
+                            dp.rrp6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'Rh00':
+                            dp.rrp12 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if key == 'Rd02':
+                            dp.rrp24 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        if verbose:
+                            print('Added forecast for station ' + dp.station_id, end='')
+                            print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+            db_session.commit()
+            return True
+        except exc.DBAPIError as err_dbapi:
+            db_session.rollback()
+            print('\nDB Error: ' + err_dbapi.__str__())
+            return False
