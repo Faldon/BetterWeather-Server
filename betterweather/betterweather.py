@@ -120,11 +120,11 @@ def weatherstation_nearest_command(latitude, longitude):
 def forecastdata_retrieve_command(file_format, verbose):
     """Update forecast data from online service"""
     if not file_format or file_format == 'csv':
-        return stations.update_mosmix_poi(app.config['FORECASTS_URL_CSV'], get_db(), verbose)
+        return forecasts.update_mosmix_poi(app.config['FORECASTS_URL_CSV'], get_db(), verbose)
     if file_format == 'ascii':
-        return stations.update_mosmix_o_underline(app.config['FORECASTS_URL_ASCII'], get_db(), verbose)
+        return forecasts.update_mosmix_o_underline(app.config['FORECASTS_URL_ASCII'], get_db(), verbose)
     if file_format == 'kml':
-        return stations.update_mosmix_kml(app.config['FORECASTS_URL_KML'], get_db(), verbose)
+        return forecasts.update_mosmix_kml(app.config['FORECASTS_URL_KML'], get_db(), verbose)
 
 
 @app.cli.command('forecastdata_print')
