@@ -367,9 +367,12 @@ def update_mosmix_kml(root_url, db_session, verbose):
                 db_session.add(weather_station)
                 if verbose:
                     print('New station ' + station_id + ' added.')
+            values = dict()
             for data in placemark.iterfind('.//dwd:Forecast', KML_NS):
                 key = data.get('{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
-                values = data.find('./dwd:value', KML_NS).text.split()
+                values[key] = data.find('./dwd:value', KML_NS).text.split()
+            try:
+                db_session.begin(subtransactions=True)
                 for i in range(0, len(forecast_dates)):
                     dp = db_session.query(ForecastData).filter(
                         ForecastData.station_id == station_id,
@@ -383,67 +386,43 @@ def update_mosmix_kml(root_url, db_session, verbose):
                             station_id=station_id
                         )
                         db_session.add(dp)
-                    if key == 'TTT':
-                        dp.tt = float(values[i]) * 1.852001 if values[i] != '-' else None
-                    if key == 'T5cm':
-                        dp.tg = float(values[i]) * 1.852001 if values[i] != '-' else None
-                    if key == 'Td':
-                        dp.td = float(values[i]) * 1.852001 if values[i] != '-' else None
-                    if key == 'TX':
-                        dp.tx = float(values[i]) * 1.852001 if values[i] != '-' else None
-                    if key == 'TN':
-                        dp.tn = float(values[i]) * 1.852001 if values[i] != '-' else None
-                    if key == 'DD':
-                        dp.dd = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'FF':
-                        dp.ff = float(values[i]) * (18 / 5) if values[i] != '-' else None
-                    if key == 'FX1':
-                        dp.fx = float(values[i]) * (18 / 5) if values[i] != '-' else None
-                    if key == 'RR1c':
-                        dp.rr1 = float(values[i]) * (18 / 5) if values[i] != '-' else None
-                    if key == 'RR3c':
-                        dp.rr3 = float(values[i]) * (18 / 5) if values[i] != '-' else None
-                    if key == 'WW':
-                        dp.ww = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'W1W2':
-                        dp.w = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'N':
-                        dp.n = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'Neff':
-                        dp.nf = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'Nl':
-                        dp.nl = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'Nm':
-                        dp.nm = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'Nh':
-                        dp.nh = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'PPPP':
-                        dp.pppp = float(values[i]) / 100 if values[i] != '-' else None
-                    if key == 'RadS3':
-                        dp.qsw3 = float(values[i]) if values[i] != '-' else None
-                    if key == 'Rad1h':
-                        dp.gss1 = float(values[i]) if values[i] != '-' else None
-                    if key == 'RadL3':
-                        dp.qlw3 = float(values[i]) if values[i] != '-' else None
-                    if key == 'VV':
-                        dp.vv = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'SunD1':
-                        dp.ss1 = float(values[i]) if values[i] != '-' else None
-                    if key == 'FXh25':
-                        dp.fx6 = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'FXh40':
-                        dp.fx9 = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'FXh55':
-                        dp.fx11 = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'R602':
-                        dp.rrp6 = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'Rh00':
-                        dp.rrp12 = int(float(values[i])) if values[i] != '-' else None
-                    if key == 'Rd02':
-                        dp.rrp24 = int(float(values[i])) if values[i] != '-' else None
+                    dp.tt = float(values['TTT'][i]) * 1.852001 if values.get('TTT', {i: '-'})[i] != '-' else None
+                    dp.tg = float(values['T5cm'][i]) * 1.852001 if values.get('T5cm', {i: '-'})[i] != '-' else None
+                    dp.td = float(values['Td'][i]) * 1.852001 if values.get('Td', {i: '-'})[i] != '-' else None
+                    dp.tx = float(values['TX'][i]) * 1.852001 if values.get('TX', {i: '-'})[i] != '-' else None
+                    dp.tn = float(values['TN'][i]) * 1.852001 if values.get('TN', {i: '-'})[i] != '-' else None
+                    dp.dd = int(float(values['DD'][i])) if values.get('DD', {i: '-'})[i] != '-' else None
+                    dp.ff = float(values['FF'][i]) * (18 / 5) if values.get('FF', {i: '-'})[i] != '-' else None
+                    dp.fx = float(values['FX1'][i]) * (18 / 5) if values.get('FX1', {i: '-'})[i] != '-' else None
+                    dp.rr1 = float(values['RR1c'][i]) * (18 / 5) if values.get('RR1c', {i: '-'})[i] != '-' else None
+                    dp.rr3 = float(values['RR3c'][i]) * (18 / 5) if values.get('RR3c', {i: '-'})[i] != '-' else None
+                    dp.ww = int(float(values['ww'][i])) if values.get('ww', {i: '-'})[i] != '-' else None
+                    dp.w = int(float(values['W1W2'][i])) if values.get('W1W2', {i: '-'})[i] != '-' else None
+                    dp.n = int(float(values['N'][i])) if values.get('N', {i: '-'})[i] != '-' else None
+                    dp.nf = int(float(values['Neff'][i])) if values.get('Neff', {i: '-'})[i] != '-' else None
+                    dp.nl = int(float(values['Nl'][i])) if values.get('Nl', {i: '-'})[i] != '-' else None
+                    dp.nm = int(float(values['Nm'][i])) if values.get('Nm', {i: '-'})[i] != '-' else None
+                    dp.nh = int(float(values['Nh'][i])) if values.get('Nh', {i: '-'})[i] != '-' else None
+                    dp.pppp = float(values['PPPP'][i]) / 100 if values.get('PPPP', {i: '-'})[i] != '-' else None
+                    dp.qsw3 = float(values['RadS3'][i]) if values.get('RadS3', {i: '-'})[i] != '-' else None
+                    dp.gss1 = float(values['Rad1h'][i]) if values.get('Rad1h', {i: '-'})[i] != '-' else None
+                    dp.qlw3 = float(values['RadL3'][i]) if values.get('RadL3', {i: '-'})[i] != '-' else None
+                    dp.vv = int(float(values['VV'][i])) if values.get('VV', {i: '-'})[i] != '-' else None
+                    dp.ss1 = float(values['SunD1'][i]) if values.get('SunD1', {i: '-'})[i] != '-' else None
+                    dp.fx6 = int(float(values['FXh25'][i])) if values.get('FXh25', {i: '-'})[i] != '-' else None
+                    dp.fx9 = int(float(values['FXh40'][i])) if values.get('FXh40', {i: '-'})[i] != '-' else None
+                    dp.fx11 = int(float(values['FXh55'][i])) if values.get('FXh55', {i: '-'})[i] != '-' else None
+                    dp.rrp6 = int(float(values['R602'][i])) if values.get('R602', {i: '-'})[i] != '-' else None
+                    dp.rrp12 = int(float(values['Rh00'][i])) if values.get('Rh00', {i: '-'})[i] != '-' else None
+                    dp.rrp24 = int(float(values['Rd02'][i])) if values.get('Rd02', {i: '-'})[i] != '-' else None
                     if verbose:
                         print('Added forecast for station ' + dp.station_id, end='')
                         print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
+                db_session.commit()
+            except exc.DBAPIError as err_dbapi:
+                if verbose:
+                    print(err_dbapi)
+                continue
         os.remove(file[0])
         os.remove('/tmp/' + file_name)
         if verbose:
