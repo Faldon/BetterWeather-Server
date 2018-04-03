@@ -4,11 +4,12 @@ import csv
 import bz2
 import zipfile
 import multiprocessing
-from xml.etree import ElementTree
+import sys
+from xml.etree import cElementTree as ElementTree
 from urllib import request, error
 from datetime import datetime, timedelta
 from sqlalchemy.orm.session import Session
-from sqlalchemy import exc
+from sqlalchemy import exc, select
 from sqlalchemy.orm import joinedload
 from betterweather import betterweather
 from betterweather.models import ForecastData, WeatherStation
@@ -303,6 +304,9 @@ def update_mosmix_kml(root_url, verbose):
     start = datetime.now()
     print(start)
     url = root_url + 'MOSMIX_S_LATEST_240.kmz'
+    db_session = betterweather.connect_db()
+    db_session.autoflush = False
+    db_session.begin()
     if verbose:
         print('Retrieving forecast data from ' + url)
     try:
@@ -311,6 +315,7 @@ def update_mosmix_kml(root_url, verbose):
         file_name = zip_handle.filelist[0].filename
         zip_handle.extractall(path='/tmp/')
         forecast_dates = []
+        merges = []
         kml_root = ElementTree.parse('/tmp/' + file_name)
         for timestep in kml_root.findall('.//dwd:TimeStep', KML_NS):
             forecast_dates.append(datetime.strptime(timestep.text, '%Y-%m-%dT%H:%M:%S.000Z'))
@@ -318,13 +323,16 @@ def update_mosmix_kml(root_url, verbose):
         chunk_size = int(len(placemarks) / 4)
         processes = []
         for partition in ([placemarks[i:i+chunk_size] for i in range(0, len(placemarks), chunk_size)]):
-            local_process = multiprocessing.Process(target=__process_kml, args=(forecast_dates, partition, verbose))
+            local_process = multiprocessing.Process(target=__process_kml, args=(forecast_dates, partition, verbose, merges))
             local_process.start()
             processes.append(local_process)
         for p in processes:
             if not p == multiprocessing.current_process():
                 p.join()
 
+        print("All processes joined")
+        db_session.bulk_save_objects(merges)
+        db_session.commit()
         os.remove(file[0])
         os.remove('/tmp/' + file_name)
         end = datetime.now()
@@ -333,6 +341,10 @@ def update_mosmix_kml(root_url, verbose):
         if verbose:
             print('Processing of ' + file_name + ' finished.')
         return True
+    except exc.DBAPIError as err_dbapi:
+        db_session.rollback()
+        print('\nDB Error: ' + err_dbapi.__str__())
+        return False
     except error.HTTPError as err_http:
         print('HTTP Error while retrieving forecast data: ' + err_http.__str__())
         return False
@@ -380,20 +392,23 @@ def get_forecast(db, station_id, timestamp, full):
     return None
 
 
-def __process_kml(dates, placemarks, verbose):
+def __process_kml(dates, placemarks, verbose, merges):
     """Process forecasts for writing to the database
 
     :param dates: A list of forecast dates
     :param placemarks: A list of placemarks
     :param verbose: Print verbose output
+    :param merges: The array where to write objects to save to the database
     :return:
     """
     with betterweather.app.app_context():
-        forecast_data = dict()
         db_session = betterweather.connect_db()
         db_session.autoflush = False
-        db_session.begin(subtransactions=True)
+        # db_session.begin(subtransactions=True)
         try:
+            # new_weatherstations = []
+            # new_forecast_data = []
+            forecast_data = ForecastData()
             for placemark in placemarks:
                 station_id = placemark.find('./kml:name', KML_NS).text
                 station_name = placemark.find('./kml:description', KML_NS).text
@@ -410,89 +425,101 @@ def __process_kml(dates, placemarks, verbose):
                         longitude=station_longitude,
                         amsl=station_amsl
                     )
-                    db_session.add(weather_station)
+                    merges.append(weather_station)
                     if verbose:
                         print('New station ' + station_id + ' added.')
-                for data in placemark.findall('.//dwd:Forecast', KML_NS):
+            # db_session.bulk_save_objects(new_weatherstations)
+            for placemark in placemarks:
+                station_id = placemark.find('./kml:name', KML_NS).text
+                values = dict()
+                for data in placemark.iterfind('.//dwd:Forecast', KML_NS):
                     key = data.get(
                         '{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
-                    forecast_data[key] = data.find('./dwd:value', KML_NS).text.split()
-                for i in range(0, len(dates)):
-                    dp = db_session.query(ForecastData).filter(
-                        ForecastData.station_id == station_id,
-                        ForecastData.date == dates[i].date(),
-                        ForecastData.time == dates[i].time()
-                    ).first()
-                    if not dp:
-                        dp = ForecastData(
-                            date=dates[i].date(),
-                            time=dates[i].time(),
-                            station_id=station_id
+                    values[key] = data.find('./dwd:value', KML_NS).text.split()
+                try:
+                    # db_session.begin(subtransactions=True)
+                    for i in range(0, len(dates)):
+                        rslt = db_session.execute(
+                            forecast_data.__table__.select().where(
+                                forecast_data.date == dates[i].date()
+                            ).where(
+                                forecast_data.time == dates[i].time()
+                            ).where(
+                                forecast_data.station_id == station_id
+                            )
                         )
-                        db_session.add(dp)
-                    for key in forecast_data.keys():
-                        if key == 'TTT':
-                            dp.tt = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                        if key == 'T5cm':
-                            dp.tg = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                        if key == 'Td':
-                            dp.td = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                        if key == 'TX':
-                            dp.tx = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                        if key == 'TN':
-                            dp.tn = float(forecast_data[key][i]) * 1.852001 if forecast_data[key][i] != '-' else None
-                        if key == 'DD':
-                            dp.dd = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'FF':
-                            dp.ff = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                        if key == 'FX1':
-                            dp.fx = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                        if key == 'RR1c':
-                            dp.rr1 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                        if key == 'RR3c':
-                            dp.rr3 = float(forecast_data[key][i]) * (18 / 5) if forecast_data[key][i] != '-' else None
-                        if key == 'WW':
-                            dp.ww = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'W1W2':
-                            dp.w = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'N':
-                            dp.n = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'Neff':
-                            dp.nf = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'Nl':
-                            dp.nl = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'Nm':
-                            dp.nm = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'Nh':
-                            dp.nh = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'PPPP':
-                            dp.pppp = float(forecast_data[key][i]) / 100 if forecast_data[key][i] != '-' else None
-                        if key == 'RadS3':
-                            dp.qsw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                        if key == 'Rad1h':
-                            dp.gss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                        if key == 'RadL3':
-                            dp.qlw3 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                        if key == 'VV':
-                            dp.vv = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'SunD1':
-                            dp.ss1 = float(forecast_data[key][i]) if forecast_data[key][i] != '-' else None
-                        if key == 'FXh25':
-                            dp.fx6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'FXh40':
-                            dp.fx9 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'FXh55':
-                            dp.fx11 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'R602':
-                            dp.rrp6 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'Rh00':
-                            dp.rrp12 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
-                        if key == 'Rd02':
-                            dp.rrp24 = int(float(forecast_data[key][i])) if forecast_data[key][i] != '-' else None
+                        dp = rslt.first()
+                        # dp = db_session.query(ForecastData).filter(
+                        #    ForecastData.station_id == station_id,
+                        #    ForecastData.date == dates[i].date(),
+                        #    ForecastData.time == dates[i].time()
+                        # ).first()
+                        if not dp:
+                            dp = ForecastData(
+                                date=dates[i].date(),
+                                time=dates[i].time(),
+                                station_id=station_id
+                            )
+                        # db_session.add(dp)
+                        dp.tt = float(values['TTT'][i]) * 1.852001 if values.get('TTT', {i: '-'})[i] != '-' else None
+                        dp.tg = float(values['T5cm'][i]) * 1.852001 if values.get('T5cm', {i: '-'})[i] != '-' else None
+                        dp.td = float(values['Td'][i]) * 1.852001 if values.get('Td', {i: '-'})[i] != '-' else None
+                        dp.tx = float(values['TX'][i]) * 1.852001 if values.get('TX', {i: '-'})[i] != '-' else None
+                        dp.tn = float(values['TN'][i]) * 1.852001 if values.get('TN', {i: '-'})[i] != '-' else None
+                        dp.dd = int(float(values['DD'][i])) if values.get('DD', {i: '-'})[i] != '-' else None
+                        dp.ff = float(values['FF'][i]) * (18 / 5) if values.get('FF', {i: '-'})[i] != '-' else None
+                        dp.fx = float(values['FX1'][i]) * (18 / 5) if values.get('FX1', {i: '-'})[i] != '-' else None
+                        dp.rr1 = float(values['RR1c'][i]) * (18 / 5) if values.get('RR1c', {i: '-'})[i] != '-' else None
+                        dp.rr3 = float(values['RR3c'][i]) * (18 / 5) if values.get('RR3c', {i: '-'})[i] != '-' else None
+                        dp.ww = int(float(values['ww'][i])) if values.get('ww', {i: '-'})[i] != '-' else None
+                        dp.w = int(float(values['W1W2'][i])) if values.get('W1W2', {i: '-'})[i] != '-' else None
+                        dp.n = int(float(values['N'][i])) if values.get('N', {i: '-'})[i] != '-' else None
+                        dp.nf = int(float(values['Neff'][i])) if values.get('Neff', {i: '-'})[i] != '-' else None
+                        dp.nl = int(float(values['Nl'][i])) if values.get('Nl', {i: '-'})[i] != '-' else None
+                        dp.nm = int(float(values['Nm'][i])) if values.get('Nm', {i: '-'})[i] != '-' else None
+                        dp.nh = int(float(values['Nh'][i])) if values.get('Nh', {i: '-'})[i] != '-' else None
+                        dp.pppp = float(values['PPPP'][i]) / 100 if values.get('PPPP', {i: '-'})[i] != '-' else None
+                        dp.qsw3 = float(values['RadS3'][i]) if values.get('RadS3', {i: '-'})[i] != '-' else None
+                        dp.gss1 = float(values['Rad1h'][i]) if values.get('Rad1h', {i: '-'})[i] != '-' else None
+                        dp.qlw3 = float(values['RadL3'][i]) if values.get('RadL3', {i: '-'})[i] != '-' else None
+                        dp.vv = int(float(values['VV'][i])) if values.get('VV', {i: '-'})[i] != '-' else None
+                        dp.ss1 = float(values['SunD1'][i]) if values.get('SunD1', {i: '-'})[i] != '-' else None
+                        dp.fx6 = int(float(values['FXh25'][i])) if values.get('FXh25', {i: '-'})[i] != '-' else None
+                        dp.fx9 = int(float(values['FXh40'][i])) if values.get('FXh40', {i: '-'})[i] != '-' else None
+                        dp.fx11 = int(float(values['FXh55'][i])) if values.get('FXh55', {i: '-'})[i] != '-' else None
+                        dp.rrp6 = int(float(values['R602'][i])) if values.get('R602', {i: '-'})[i] != '-' else None
+                        dp.rrp12 = int(float(values['Rh00'][i])) if values.get('Rh00', {i: '-'})[i] != '-' else None
+                        dp.rrp24 = int(float(values['Rd02'][i])) if values.get('Rd02', {i: '-'})[i] != '-' else None
+                        merges.append(dp)
                         if verbose:
                             print('Added forecast for station ' + dp.station_id, end='')
                             print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
-            db_session.commit()
+                        # if sys.getsizeof(new_forecast_data) >= (512 * 1024):
+                            # db_session.begin(subtransactions=True)
+                            # db_session.add_all(new_forecast_data)
+                            # db_session.commit()
+                            # db_session.flush()
+                            # db_session.bulk_save_objects(new_forecast_data)
+                            # db_session.bulk_insert_mappings(ForecastData, new_forecast_data)
+                            # db_session.merge(new_forecast_data)
+                            # db_session.commit()
+                            # db_session.flush()
+                            # new_forecast_data.clear()
+                            print("New forecasts added")
+                    # db_session.commit()
+                except exc.DBAPIError as err_dbapi:
+                    print('\nDB Error: ' + err_dbapi.__str__())
+                    db_session.rollback()
+                    return False
+            # if len(new_forecast_data) > 0:
+                # db_session.bulk_save_objects(new_forecast_data)
+                # db_session.bulk_insert_mappings(ForecastData, new_forecast_data)
+                # db_session.begin(subtransactions=True)
+                # db_session.merge(new_forecast_data)
+                # db_session.commit()
+                # db_session.flush()
+                # new_forecast_data.clear()
+                # print("New forecasts added")
             return True
         except exc.DBAPIError as err_dbapi:
             db_session.rollback()
