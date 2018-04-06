@@ -1,6 +1,6 @@
 from sqlalchemy.orm.session import Session
 from sqlalchemy import exc
-DB_VERSION = 1
+DB_VERSION = 2
 
 
 def get_version():
@@ -63,7 +63,24 @@ def schema_update(db, force=False, verbose=False):
             'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
         })
         for i in range(version, DB_VERSION):
-            pass
+            if i == 1:
+                """ Migrating to DB Version 2"""
+                queries.append({
+                    'sql': """ALTER TABLE forecast_data ALTER COLUMN id DROP DEFAULT;""",
+                    'params': None
+                })
+                queries.append({
+                    'sql': """DROP SEQUENCE forecast_data_id_seq;""",
+                    'params': None
+                })
+                queries.append({
+                    'sql': """ALTER TABLE forecast_data ALTER COLUMN id SET DATA TYPE VARCHAR(23);""",
+                    'params': None
+                })
+                queries.append({
+                    'sql': """UPDATE forecast_data SET id = CONCAT(station_id, date, time);""",
+                    'params': None
+                })
     if verbose:
         __print_raw_sql(queries)
     if force:
@@ -98,6 +115,6 @@ def __quote(value):
     if value is None:
         return 'NULL'
     if type(value) is str:
-        return "'" + value + "'"
+        return "'" + value.replace("'", "''") + "'"
     return value.__str__()
 

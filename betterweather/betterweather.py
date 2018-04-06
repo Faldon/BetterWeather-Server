@@ -35,7 +35,6 @@ def get_db():
 def close_db(err):
     if hasattr(g, 'db_engine') and g.db_engine:
         g.db_engine.dispose()
-    print(err)
 
 
 @app.cli.command('schema_create')
