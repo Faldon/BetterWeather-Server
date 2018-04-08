@@ -214,7 +214,7 @@ class ForecastData(Base, Entity):
         """
         return {
             'id': self.id,
-            'station': self.station_id if not full else self.station.to_dict(),
+            'station_id': self.station_id if not full else self.station.to_dict(),
             'date': self.date.__str__(),
             'time': self.time.__str__(),
             't': self.t,

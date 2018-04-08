@@ -2,6 +2,7 @@ import os
 import re
 import csv
 import bz2
+import time
 import zipfile
 import multiprocessing
 from xml.etree import cElementTree as ElementTree
@@ -240,9 +241,14 @@ def __process_links_poi(root_url, links, stations, verbose, result_queue):
             url = root_url + link
             try:
                 file = request.urlretrieve(url)
+                time.sleep(1)
             except error.ContentTooShortError as err_content_to_short:
                 if verbose:
                     print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
+                continue
+            except error.URLError as url_error:
+                if verbose:
+                    print("Download of " + url + 'failed: ' + url_error.__str__())
                 continue
             with open(file[0], 'r') as forecast_for_station:
                 csv_reader = csv.reader(forecast_for_station, delimiter=";")
@@ -303,6 +309,7 @@ def __process_links_poi(root_url, links, stations, verbose, result_queue):
                 if verbose:
                     print('\nProcessing data for station ' + station_id + ' finished.')
             os.remove(file[0])
+            request.urlcleanup()
             result_queue.cancel_join_thread()
         return True
 
@@ -337,7 +344,7 @@ def __process_link_ascii(root_url, link, verbose, result_queue):
                     station_longitude = float(lon)
                     station_latitude = float(lat)
                     station_amsl = int(props[2])
-                    
+
                     weather_station = WeatherStation()
                     weather_station.id = station_id
                     weather_station.name = station_name
