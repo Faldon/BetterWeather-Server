@@ -5,6 +5,7 @@ import bz2
 import time
 import zipfile
 import multiprocessing
+from queue import Empty
 from xml.etree import cElementTree as ElementTree
 from urllib import request, error
 from datetime import datetime, timedelta
@@ -144,20 +145,23 @@ def update_mosmix_kml(root_url, verbose):
             forecast_dates.append(datetime.strptime(timestep.text, '%Y-%m-%dT%H:%M:%S.000Z'))
         placemarks = kml_root.findall('.//kml:Placemark', KML_NS)
         chunk_size = int(len(placemarks) / len(os.sched_getaffinity(0)))
-        processes = []
         result_queue = multiprocessing.JoinableQueue()
         for partition in ([placemarks[i:i+chunk_size] for i in range(0, len(placemarks), chunk_size)]):
             local_process = multiprocessing.Process(target=__process_kml,
                                                     args=(forecast_dates, partition, verbose, result_queue))
             local_process.start()
-            processes.append(local_process)
-        for p in processes:
-            if not p == multiprocessing.current_process():
-                p.join()
 
+        queries = []
+        while len(multiprocessing.active_children()) > 0:
+            try:
+                sql = result_queue.get(block=True, timeout=10)
+                queries.append(sql)
+                result_queue.task_done()
+            except Empty:
+                pass
         db_session.execute("START TRANSACTION;")
-        while not result_queue.empty():
-            db_session.execute(result_queue.get())
+        for query in queries:
+            db_session.execute(query)
         db_session.execute("COMMIT;")
         db_session.flush()
         os.remove(file[0])
@@ -454,8 +458,7 @@ def __process_kml(dates, placemarks, verbose, result_queue):
                 result_queue.put(weather_station.to_upsert())
                 if verbose:
                     print('New station ' + station_id + ' added.')
-            for placemark in placemarks:
-                station_id = placemark.find('./kml:name', KML_NS).text
+
                 values = dict()
                 for data in placemark.iterfind('.//dwd:Forecast', KML_NS):
                     key = data.get(
@@ -504,5 +507,6 @@ def __process_kml(dates, placemarks, verbose, result_queue):
         except Exception as err:
             print('\nError: ' + err.__str__())
         finally:
-            result_queue.cancel_join_thread()
+            result_queue.close()
+            result_queue.join_thread()
     return result
