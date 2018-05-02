@@ -386,11 +386,11 @@ def update_mosmix_kml(root_url, db_session, verbose):
                             station_id=station_id
                         )
                         db_session.add(dp)
-                    dp.tt = float(values['TTT'][i]) * 1.852001 if values.get('TTT', {i: '-'})[i] != '-' else None
-                    dp.tg = float(values['T5cm'][i]) * 1.852001 if values.get('T5cm', {i: '-'})[i] != '-' else None
-                    dp.td = float(values['Td'][i]) * 1.852001 if values.get('Td', {i: '-'})[i] != '-' else None
-                    dp.tx = float(values['TX'][i]) * 1.852001 if values.get('TX', {i: '-'})[i] != '-' else None
-                    dp.tn = float(values['TN'][i]) * 1.852001 if values.get('TN', {i: '-'})[i] != '-' else None
+                    dp.tt = float(values['TTT'][i]) - 273.15 if values.get('TTT', {i: '-'})[i] != '-' else None
+                    dp.tg = float(values['T5cm'][i]) - 273.15 if values.get('T5cm', {i: '-'})[i] != '-' else None
+                    dp.td = float(values['Td'][i]) - 273.15 if values.get('Td', {i: '-'})[i] != '-' else None
+                    dp.tx = float(values['TX'][i]) - 273.15 if values.get('TX', {i: '-'})[i] != '-' else None
+                    dp.tn = float(values['TN'][i]) - 273.15 if values.get('TN', {i: '-'})[i] != '-' else None
                     dp.dd = int(float(values['DD'][i])) if values.get('DD', {i: '-'})[i] != '-' else None
                     dp.ff = float(values['FF'][i]) * (18 / 5) if values.get('FF', {i: '-'})[i] != '-' else None
                     dp.fx = float(values['FX1'][i]) * (18 / 5) if values.get('FX1', {i: '-'})[i] != '-' else None
