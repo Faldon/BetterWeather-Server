@@ -98,7 +98,7 @@ def schema_update(db, db_user, force=False, verbose=False):
                     'params': None
                 })
                 queries.append({
-                    'sql': """GRANT USAGE, SELECT ON SEQUENCE forecast_data_id_seq TO""" + db_user + """;""",
+                    'sql': """GRANT USAGE, SELECT ON SEQUENCE forecast_data_id_seq TO """ + db_user + """;""",
                     'params': None
                 })
                 queries.append({
