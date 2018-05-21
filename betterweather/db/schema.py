@@ -94,7 +94,7 @@ def schema_update(db, db_user, force=False, verbose=False):
                 })
                 queries.append({
                     'sql': "ALTER TABLE forecast_data " +
-                           "ADD COLUMND id INT PRIMARY KEY DEFAULT nextval('forecast_data_id_seq');",
+                           "ADD COLUMN id INT PRIMARY KEY DEFAULT nextval('forecast_data_id_seq');",
                     'params': None
                 })
                 queries.append({
