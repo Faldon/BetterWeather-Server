@@ -1,5 +1,5 @@
-import csv
 import re
+import csv
 from sqlalchemy import exc
 from math import sin, cos, sqrt, atan2, radians
 from betterweather.models import WeatherStation

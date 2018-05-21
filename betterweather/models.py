@@ -1,18 +1,57 @@
 import json
 from sqlalchemy import *
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, synonym
+from sqlalchemy.orm import relationship
+from betterweather.db.schema import __quote as quote
 
 Base = declarative_base()
 
 
-class DBInformation(Base):
+class Entity:
+    __tablename__ = ''
+
+    def to_dict(self):
+        raise NotImplementedError
+
+    def to_insert(self):
+        query = "INSERT INTO " + self.__tablename__ + "(" + ",".join(self.to_dict().keys()) + ") VALUES("
+        for value in self.to_dict().values():
+            query += quote(value) + ","
+        query = query[:-1] + ");"
+        return query
+
+    def to_update(self):
+        query = "UPDATE " + self.__tablename__ + " SET "
+        for key, value in self.to_dict().items():
+            if key != "id":
+                query += key + "=" + quote(value) + ","
+        query = query[:-1] + " WHERE id = " + quote(self.to_dict()['id']) + ";"
+        return query
+
+    def to_upsert(self):
+        query = "INSERT INTO " + self.__tablename__ + "(" + ",".join(self.to_dict().keys()) + ") SELECT "
+        for value in self.to_dict().values():
+            query += quote(value) + ","
+        query = query[:-1] + " FROM (SELECT 0 as i) AS mutex "
+        query += "LEFT JOIN " + self.__tablename__ + " ON id = " + quote(self.to_dict()['id']) + " "
+        query += "WHERE i = 0 AND id IS NULL;\n"
+        query += self.to_update()
+        return query
+
+
+class DBInformation(Base, Entity):
     __tablename__ = 'db_information'
     name = Column(String(13), primary_key=True)
     version = Column(Integer, nullable=False)
 
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'version': self.version
+        }
 
-class WeatherCode(Base):
+
+class WeatherCode(Base, Entity):
     __tablename__ = 'weather_codes'
     id = Column(Integer, primary_key=True)
     precipitation = Column(Boolean, nullable=False)
@@ -42,7 +81,7 @@ class WeatherCode(Base):
         }
 
 
-class WeatherStation(Base):
+class WeatherStation(Base, Entity):
     __tablename__ = 'weather_stations'
     id = Column(String(5), primary_key=True)
     name = Column(String(255), nullable=False)
@@ -69,9 +108,10 @@ class WeatherStation(Base):
         }
 
 
-class ForecastData(Base):
+class ForecastData(Base, Entity):
     __tablename__ = 'forecast_data'
     id = Column(Integer, primary_key=True, autoincrement=True)
+    issuetime = Column(DateTime, nullable=False, comment='Issue time of forecast')
     date = Column(Date, nullable=False, comment='Day of forecast')
     time = Column(Time, nullable=False, comment='Time of forecast')
     t = Column(Float, comment='dry bulb temperature at ground in degrees C')
@@ -116,7 +156,6 @@ class ForecastData(Base):
     station_id = Column(String(5), ForeignKey('weather_stations.id'))
 
     station = relationship("WeatherStation", back_populates="forecast_data")
-    __table_args__ = (UniqueConstraint('station_id', 'date', 'time', name='uq_forecast_data.station_id_date_time'),)
 
     def to_json(self):
         """Return the object as JSON"""
@@ -125,6 +164,7 @@ class ForecastData(Base):
             'station_id': self.station_id,
             'date': self.date.__str__(),
             'time': self.time.__str__(),
+            'issuetime': self.issuetime.__str__(),
             't': self.t,
             'tt': self.tt,
             'td': self.td,
@@ -175,9 +215,10 @@ class ForecastData(Base):
         """
         return {
             'id': self.id,
-            'station': self.station_id if not full else self.station.to_dict(),
+            'station_id': self.station_id if not full else self.station.to_dict(),
             'date': self.date.__str__(),
             'time': self.time.__str__(),
+            'issuetime': self.issuetime.__str__(),
             't': self.t,
             'tt': self.tt,
             'td': self.td,
@@ -218,6 +259,22 @@ class ForecastData(Base):
             'qlw1': self.qlw1,
             'qlw3': self.qlw3
         }
+
+    def to_values(self):
+        query = "("
+        for key, value in self.to_dict().items():
+            if key != 'id':
+                query += quote(value) + ","
+        query = query[:-1] + ")"
+        return query
+
+    def to_insert(self):
+        query = "INSERT INTO " + self.__tablename__ + "(" + ",".join(list(self.to_dict().keys())[1:]) + ") VALUES("
+        for key, value in self.to_dict().items():
+            if key != 'id':
+                query += quote(value) + ","
+        query = query[:-1] + ");"
+        return query
 
 
 WeatherStation.forecast_data = relationship("ForecastData", order_by=ForecastData.id, back_populates="station")

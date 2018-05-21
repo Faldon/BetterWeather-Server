@@ -82,7 +82,7 @@ def schema_drop_command(sql, force, full):
 @click.option('--force', is_flag=True, help='Force the operation on the connected database')
 def schema_migrate_command(sql, force):
     """Migrate the database version"""
-    success = schema.schema_update(get_db(), force, sql)
+    success = schema.schema_update(get_db(), app.config['DATABASE'].get('USER'), force, sql)
     if not success and force:
         print('An error occured during migration operation.')
 
@@ -115,22 +115,17 @@ def weatherstation_nearest_command(latitude, longitude):
 
 
 @app.cli.command('forecastdata_retrieve')
-@click.option('--file_format', help='The file format to use [default=csv]', type=click.Choice(['csv', 'kml', 'ascii']))
 @click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
-def forecastdata_retrieve_command(file_format, verbose):
+def forecastdata_retrieve_command(verbose):
     """Update forecast data from online service"""
-    if not file_format or file_format == 'csv':
-        return forecasts.update_mosmix_poi(app.config['FORECASTS_URL_CSV'], get_db(), verbose)
-    if file_format == 'ascii':
-        return forecasts.update_mosmix_o_underline(app.config['FORECASTS_URL_ASCII'], get_db(), verbose)
-    if file_format == 'kml':
-        return forecasts.update_mosmix_kml(app.config['FORECASTS_URL_KML'], get_db(), verbose)
+    return forecasts.update_mosmix_kml(app.config['FORECASTS_URL_KML'], verbose)
 
 
 @app.cli.command('forecastdata_print')
 @click.argument('station_id')
 @click.option('--forecast_date', help='The time for the forecast formatted %Y-%m-%d %H:%M [default=now]')
-def forecastdata_print_command(station_id, forecast_date):
+@click.option('--full', is_flag=True, help='Also print station information')
+def forecastdata_print_command(station_id, forecast_date, full):
     """Print forecast data for weather station"""
     try:
         t = datetime.strptime(forecast_date, '%Y-%m-%d %H:%M').timestamp()
@@ -139,7 +134,6 @@ def forecastdata_print_command(station_id, forecast_date):
     except TypeError:
         t = datetime.now().timestamp()
 
-    full = request.args.get('full', default=False)
     forecast = forecasts.get_forecast(get_db(), station_id, t, full)
     print(forecast if not forecast else forecast.to_json())
 
@@ -158,8 +152,7 @@ def config_cronjob_command():
     print('export BETTERWEATHER_SETTINGS=' + app.root_path + '/production.py;', end='')
     print('cd ' + app.root_path + '/../;', end='')
     print('. venv/bin/activate;', end='')
-    print('flask forecastdata_retrieve --file_format=ascii;', end='')
-    print('flask forecastdata_retrieve --file_format=csv')
+    print('flask forecastdata_retrieve')
 
 
 @app.cli.command('config_apache')
