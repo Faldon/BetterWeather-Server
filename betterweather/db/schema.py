@@ -102,7 +102,7 @@ def schema_update(db, db_user, force=False, verbose=False):
                     'params': None
                 })
                 queries.append({
-                    'sql': 'ALTER TABLE forecast_data DROP CONSTRAINT "uq_forecast_data.station_id_date_time"',
+                    'sql': 'ALTER TABLE forecast_data DROP CONSTRAINT "uq_forecast_data.station_id_date_time";',
                     'params': None
                 })
                 queries.append({
