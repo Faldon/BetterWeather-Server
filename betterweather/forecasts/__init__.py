@@ -115,25 +115,37 @@ def get_forecast(db, station_id, timestamp, full):
             ForecastData.station_id == station_id,
             ForecastData.date == d.date(),
             ForecastData.time > d.time()
-        ).order_by(ForecastData.time.asc()).limit(1).first()
+        ).order_by(
+            ForecastData.time.asc(),
+            ForecastData.issuetime.desc()
+        ).limit(1).first()
         lesser = db.query(ForecastData).options(
             joinedload(ForecastData.station, innerjoin=True)
         ).filter(
             ForecastData.station_id == station_id,
             ForecastData.date == d.date(),
             ForecastData.time <= d.time()
-        ).order_by(ForecastData.time.desc()).limit(1).first()
+        ).order_by(
+            ForecastData.time.desc(),
+            ForecastData.issuetime.desc()
+        ).limit(1).first()
     else:
         greater = db.query(ForecastData).filter(
             ForecastData.station_id == station_id,
             ForecastData.date == d.date(),
             ForecastData.time > d.time()
-        ).order_by(ForecastData.time.asc()).limit(1).first()
+        ).order_by(
+            ForecastData.time.asc(),
+            ForecastData.issuetime.desc()
+        ).limit(1).first()
         lesser = db.query(ForecastData).filter(
             ForecastData.station_id == station_id,
             ForecastData.date == d.date(),
             ForecastData.time <= d.time()
-        ).order_by(ForecastData.time.desc()).limit(1).first()
+        ).order_by(
+            ForecastData.time.desc(),
+            ForecastData.issuetime.desc()
+        ).limit(1).first()
 
     if greater is None and lesser is not None:
         return lesser
