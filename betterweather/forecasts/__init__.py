@@ -109,9 +109,11 @@ def get_forecast(db, station_id, timestamp, full):
     """
     d = datetime.fromtimestamp(timestamp)
     greater = db.query(ForecastData).filter(
+        ForecastData.date == d.date(),
         ForecastData.time > d.time()
     ).order_by(ForecastData.time.asc()).limit(1).subquery().select()
     lesser = db.query(ForecastData).filter(
+        ForecastData.date == d.date(),
         ForecastData.time <= d.time()
     ).order_by(ForecastData.time.desc()).limit(1).subquery().select()
 
@@ -125,7 +127,6 @@ def get_forecast(db, station_id, timestamp, full):
             joinedload(ForecastData.station, innerjoin=True)
         ).filter(
             ForecastData.station_id == station_id,
-            ForecastData.date == d.date()
         ).order_by(
             abs_diff.asc(),
             ForecastData.issuetime.desc()
@@ -133,7 +134,6 @@ def get_forecast(db, station_id, timestamp, full):
     else:
         q = db.query(the_alias).filter(
             ForecastData.station_id == station_id,
-            ForecastData.date == d.date()
         ).order_by(
             abs_diff.asc(),
             ForecastData.issuetime.desc()
