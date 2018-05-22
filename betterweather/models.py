@@ -260,20 +260,13 @@ class ForecastData(Base, Entity):
             'qlw3': self.qlw3
         }
 
-    def to_values(self):
-        query = "("
-        for key, value in self.to_dict().items():
-            if key != 'id':
-                query += quote(value) + ","
-        query = query[:-1] + ")"
-        return query
-
     def to_insert(self):
-        query = "INSERT INTO " + self.__tablename__ + "(" + ",".join(list(self.to_dict().keys())[1:]) + ") VALUES("
+        query = "INSERT INTO " + self.__tablename__ + "(" + ",".join(['!' for i in range(1, len(self.to_dict().keys()))])
+        query += ") VALUES(" + ",".join(['?' for i in range(1, len(self.to_dict().keys()))]) + ");"
         for key, value in self.to_dict().items():
             if key != 'id':
-                query += quote(value) + ","
-        query = query[:-1] + ");"
+                query = query.replace("!", key, 1)
+                query = query.replace("?", quote(value), 1)
         return query
 
 

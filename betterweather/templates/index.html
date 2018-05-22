@@ -46,7 +46,7 @@
         $('#bw').submit(function(event) {
             event.preventDefault();
             $.ajax({
-                url: 'forecast/location/' + $('#bw_latitude').val() + '/' + $('#bw_longitude').val() + '/?full=true',
+                url: 'forecast/location/' + $('#bw_latitude').val() + '/' + $('#bw_longitude').val() + '/',
                 method: 'GET'
             }).done(function(data, textStatus, jqXHR) {
                 console.dir(data);
