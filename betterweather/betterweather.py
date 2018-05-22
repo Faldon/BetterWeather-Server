@@ -135,7 +135,7 @@ def forecastdata_print_command(station_id, forecast_date, full):
         t = datetime.now().timestamp()
 
     forecast = forecasts.get_forecast(get_db(), station_id, t, full)
-    print(forecast if not forecast else forecast.to_json())
+    print(forecast if not forecast else forecast.to_json(full))
 
 
 @app.cli.command('weathercode_print')

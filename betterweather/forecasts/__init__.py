@@ -108,37 +108,59 @@ def get_forecast(db, station_id, timestamp, full):
     :rtype ForecastData or None
     """
     d = datetime.fromtimestamp(timestamp)
-    greater = db.query(ForecastData).filter(
-        ForecastData.date == d.date(),
-        ForecastData.time > d.time()
-    ).order_by(ForecastData.time.asc()).limit(1).subquery().select()
-    lesser = db.query(ForecastData).filter(
-        ForecastData.date == d.date(),
-        ForecastData.time <= d.time()
-    ).order_by(ForecastData.time.desc()).limit(1).subquery().select()
-
-    the_union = union_all(lesser, greater).alias()
-    the_alias = aliased(ForecastData, the_union)
-    the_diff = getattr(the_alias, ForecastData.time.name) - d.time()
-    abs_diff = case([(the_diff < timedelta(0), -the_diff)], else_=the_diff)
-
     if full:
-        q = db.query(the_alias).options(
+        greater = db.query(ForecastData).options(
             joinedload(ForecastData.station, innerjoin=True)
         ).filter(
             ForecastData.station_id == station_id,
-        ).order_by(
-            abs_diff.asc(),
-            ForecastData.issuetime.desc()
-        )
-    else:
-        q = db.query(the_alias).filter(
+            ForecastData.date == d.date(),
+            ForecastData.time > d.time()
+        ).order_by(ForecastData.time.asc()).limit(1).first()
+        lesser = db.query(ForecastData).options(
+            joinedload(ForecastData.station, innerjoin=True)
+        ).filter(
             ForecastData.station_id == station_id,
-        ).order_by(
-            abs_diff.asc(),
-            ForecastData.issuetime.desc()
-        )
-    return q.first()
+            ForecastData.date == d.date(),
+            ForecastData.time <= d.time()
+        ).order_by(ForecastData.time.desc()).limit(1).first()
+    else:
+        greater = db.query(ForecastData).filter(
+            ForecastData.station_id == station_id,
+            ForecastData.date == d.date(),
+            ForecastData.time > d.time()
+        ).order_by(ForecastData.time.asc()).limit(1).first()
+        lesser = db.query(ForecastData).filter(
+            ForecastData.station_id == station_id,
+            ForecastData.date == d.date(),
+            ForecastData.time <= d.time()
+        ).order_by(ForecastData.time.desc()).limit(1).first()
+
+    if greater is None and lesser is not None:
+        return lesser
+    if greater is not None and lesser is None:
+        return greater
+    if greater is None and lesser is None:
+        return None
+
+    greater_timedelta = timedelta(
+        hours=greater.time.hour,
+        minutes=greater.time.minute,
+        seconds=greater.time.second
+    )
+    lesser_timedelta = timedelta(
+        hours=lesser.time.hour,
+        minutes=lesser.time.minute,
+        seconds=lesser.time.second
+    )
+    d_timedelta = timedelta(
+        hours=d.time().hour,
+        minutes=d.time().minute,
+        seconds=d.time().second
+    )
+    if (greater_timedelta - d_timedelta).total_seconds() >= (lesser_timedelta - d_timedelta).total_seconds():
+        return lesser
+    else :
+        return greater
 
 
 def __process_kml(dates, placemarks, verbose, forecast_results, station_results):

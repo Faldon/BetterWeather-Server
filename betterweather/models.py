@@ -157,11 +157,11 @@ class ForecastData(Base, Entity):
 
     station = relationship("WeatherStation", back_populates="forecast_data")
 
-    def to_json(self):
+    def to_json(self, full=False):
         """Return the object as JSON"""
         return json.dumps({
             'id': self.id,
-            'station_id': self.station_id,
+            'station_id': self.station_id if not full else self.station.to_dict(),
             'date': self.date.__str__(),
             'time': self.time.__str__(),
             'issuetime': self.issuetime.__str__(),
