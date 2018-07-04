@@ -68,7 +68,10 @@ def update_mosmix_kml(root_url, verbose):
                 forecasts.task_done()
             except Empty:
                 pass
+        today = datetime.today().date().isoformat()
         db_session.execute("START TRANSACTION;")
+        db_session.execute("INSERT INTO historical_data SELECT * FROM forecast_data WHERE date < '" + today + "';")
+        db_session.execute("DELETE FROM forecast_data WHERE date < '" + today + "';")
         for upsert in station_upserts:
             db_session.execute(upsert)
         for insert in forecast_inserts:

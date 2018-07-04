@@ -1,6 +1,6 @@
 from sqlalchemy.orm.session import Session
 from sqlalchemy import exc
-DB_VERSION = 3
+DB_VERSION = 5
 
 
 def get_version():
@@ -113,6 +113,63 @@ def schema_update(db, db_user, force=False, verbose=False):
                     'sql': "UPDATE forecast_data SET issuetime = " +
                     "to_timestamp(concat(date, time, '00'), 'YYYY-MM-DDHH24:MI:SS');",
                     'params': None
+                })
+            if i == 3:
+                queries.append({
+                    'sql': """CREATE INDEX forecast_data_station_id_date ON forecast_data(station_id, date);""",
+                    'params': None
+                })
+            if i == 4:
+                queries.append({
+                    'sql': """CREATE TABLE historical_data (
+    id INTEGER NOT NULL,
+    issuetime DATETIME NOT NULL,
+    date DATE NOT NULL,
+    time TIME NOT NULL,
+    t FLOAT,
+    tt FLOAT,
+    td FLOAT,
+    tx FLOAT,
+    tn FLOAT,
+    tm FLOAT,
+    tg FLOAT,
+    dd INTEGER,
+    ff FLOAT,
+    fx FLOAT,
+    fx6 INTEGER,
+    fx9 INTEGER,
+    fx11 INTEGER,
+    rr1 FLOAT,
+    rr3 FLOAT,
+    rr6 FLOAT,
+    rr12 FLOAT,
+    rr24 FLOAT,
+    rrp6 INTEGER,
+    rrp12 INTEGER,
+    rrp24 INTEGER,
+    ev FLOAT,
+    ww INTEGER,
+    w INTEGER,
+    vv INTEGER,
+    n INTEGER,
+    nf INTEGER,
+    nl INTEGER,
+    nm INTEGER,
+    nh INTEGER,
+    pppp FLOAT,
+    ss1 FLOAT,
+    ss24 FLOAT,
+    gss1 FLOAT,
+    gss3 FLOAT,
+    qsw1 FLOAT,
+    qsw3 FLOAT,
+    qlw1 FLOAT,
+    qlw3 FLOAT,
+    station_id VARCHAR(5),
+    PRIMARY KEY(id)
+);""",
+                    'params': None
+
                 })
 
     if verbose:
