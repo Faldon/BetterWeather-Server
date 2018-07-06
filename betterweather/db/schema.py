@@ -59,10 +59,6 @@ def schema_update(db, db_user, force=False, verbose=False):
         return False
     version = row['version']
     if version != DB_VERSION:
-        queries.append({
-            'sql': """UPDATE db_information SET version=:version WHERE name=:name;""",
-            'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
-        })
         for i in range(version, DB_VERSION):
             if i == 1:
                 """ Migrating to DB Version 2"""
@@ -122,10 +118,10 @@ def schema_update(db, db_user, force=False, verbose=False):
             if i == 4:
                 queries.append({
                     'sql': """CREATE TABLE historical_data (
-    id INTEGER NOT NULL,
-    issuetime DATETIME NOT NULL,
+    id SERIAL NOT NULL,
+    issuetime TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     date DATE NOT NULL,
-    time TIME NOT NULL,
+    time TIME WITHOUT TIME ZONE NOT NULL,
     t FLOAT,
     tt FLOAT,
     td FLOAT,
@@ -171,7 +167,10 @@ def schema_update(db, db_user, force=False, verbose=False):
                     'params': None
 
                 })
-
+        queries.append({
+            'sql': """UPDATE db_information SET version=:version WHERE name=:name;""",
+            'params': {'version': DB_VERSION, 'name': 'BetterWeather'}
+        })
     if verbose:
         __print_raw_sql(queries)
     if force:
@@ -184,6 +183,7 @@ def schema_update(db, db_user, force=False, verbose=False):
             print(err_dbapi)
             db.rollback()
             return False
+    db.rollback()
     return True
 
 
