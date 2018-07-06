@@ -6,8 +6,8 @@ from xml.etree import cElementTree as ElementTree
 from urllib import request, error
 from datetime import datetime, timedelta
 from sqlalchemy.orm.session import Session
-from sqlalchemy import exc, union_all, case
-from sqlalchemy.orm import joinedload, aliased
+from sqlalchemy import exc
+from sqlalchemy.orm import joinedload
 from betterweather import betterweather
 from betterweather.models import ForecastData, WeatherStation
 
@@ -19,6 +19,76 @@ KML_NS = {
     'xal': "urn:oasis:names:tc:ciq:xsdschema:xAL:2.0",
     'atom': "http://www.w3.org/2005/Atom"
 }
+
+
+def archive_forecast_data(verbose):
+    """Move historical data away from active data
+
+    :param bool verbose: Print verbose output
+    :return True on success, False on failure
+    :rtype: bool
+    """
+    today = datetime.today().date().isoformat()
+    db_session = betterweather.connect_db()
+    db_session.execute("START TRANSACTION;")
+    try:
+        db_session.execute("""INSERT INTO historical_data SELECT
+        id,
+        issuetime,
+        date,
+        time,
+        t,
+        tt,
+        td,
+        tx,
+        tn,
+        tm,
+        tg,
+        dd,
+        ff,
+        fx,
+        fx6,
+        fx9,
+        fx11,
+        rr1,
+        rr3,
+        rr6,
+        rr12,
+        rr24,
+        rrp6,
+        rrp12,
+        rrp24,
+        ev,
+        ww,
+        w,
+        vv,
+        n,
+        nf,
+        nl,
+        nm,
+        nh,
+        pppp,
+        ss1,
+        ss24,
+        gss1,
+        gss3,
+        qsw1,
+        qsw3,
+        qlw1,
+        qlw3,
+        station_id,
+        FROM forecast_data WHERE date < '""" + today + "';")
+        db_session.execute("DELETE FROM forecast_data WHERE date < '" + today + "';")
+        db_session.execute("COMMIT;")
+        db_session.flush()
+        if verbose:
+            print("All forecast data older than " + today + "have been moved to historical data.")
+        return True
+    except exc.DBAPIError as err_dbapi:
+        db_session.execute("ROLLBACK;")
+        db_session.flush()
+        print('\nDB Error: ' + err_dbapi.__str__())
+        return False
 
 
 def update_mosmix_kml(root_url, verbose):
@@ -68,10 +138,6 @@ def update_mosmix_kml(root_url, verbose):
                 forecasts.task_done()
             except Empty:
                 pass
-        today = datetime.today().date().isoformat()
-        db_session.execute("START TRANSACTION;")
-        db_session.execute("INSERT INTO historical_data SELECT * FROM forecast_data WHERE date < '" + today + "';")
-        db_session.execute("DELETE FROM forecast_data WHERE date < '" + today + "';")
         for upsert in station_upserts:
             db_session.execute(upsert)
         for insert in forecast_inserts:
@@ -174,7 +240,7 @@ def get_forecast(db, station_id, timestamp, full):
     )
     if (greater_timedelta - d_timedelta).total_seconds() >= (lesser_timedelta - d_timedelta).total_seconds():
         return lesser
-    else :
+    else:
         return greater
 
 

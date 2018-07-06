@@ -114,8 +114,15 @@ def weatherstation_nearest_command(latitude, longitude):
     print(stations.get_nearest_station(get_db(), latitude, longitude).to_json())
 
 
+@app.cli.command('forecastdata_archive')
+@click.option('--verbose', is_flag=True, help='Dump verbose output to the console')
+def forecastdata_archive_command(verbose):
+    """Move obsolete forecast data to historical data"""
+    return forecasts.archive_forecast_data(verbose)
+
+
 @app.cli.command('forecastdata_retrieve')
-@click.option('--verbose', is_flag=True, help='Dump the sql command to the console')
+@click.option('--verbose', is_flag=True, help='Dump verbose output to the console')
 def forecastdata_retrieve_command(verbose):
     """Update forecast data from online service"""
     return forecasts.update_mosmix_kml(app.config['FORECASTS_URL_KML'], verbose)
