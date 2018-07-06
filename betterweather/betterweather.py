@@ -159,6 +159,7 @@ def config_cronjob_command():
     print('export BETTERWEATHER_SETTINGS=' + app.root_path + '/production.py;', end='')
     print('cd ' + app.root_path + '/../;', end='')
     print('. venv/bin/activate;', end='')
+    print('flask forecastdata_archive;', end='')
     print('flask forecastdata_retrieve')
 
 
