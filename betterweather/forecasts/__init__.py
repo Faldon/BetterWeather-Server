@@ -76,7 +76,7 @@ def archive_forecast_data(verbose):
         qsw3,
         qlw1,
         qlw3,
-        station_id,
+        station_id
         FROM forecast_data WHERE date < '""" + today + "';")
         db_session.execute("DELETE FROM forecast_data WHERE date < '" + today + "';")
         db_session.execute("COMMIT;")
