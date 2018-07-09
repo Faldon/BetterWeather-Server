@@ -83,7 +83,7 @@ class WeatherCode(Base, Entity):
 
 class WeatherStation(Base, Entity):
     __tablename__ = 'weather_stations'
-    id = Column(String(5), primary_key=True)
+    id = Column(String(5), primary_key=True, autoincrement=False)
     name = Column(String(255), nullable=False)
     latitude = Column(Numeric(8, 6), nullable=False)
     longitude = Column(Numeric(9, 6), nullable=False)
@@ -110,8 +110,7 @@ class WeatherStation(Base, Entity):
 
 class ForecastData(Base, Entity):
     __tablename__ = 'forecast_data'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    issuetime = Column(DateTime, nullable=False, comment='Issue time of forecast')
+    id = Column(Integer, primary_key=True, autoincrement=False)
     date = Column(Date, nullable=False, comment='Day of forecast')
     time = Column(Time, nullable=False, comment='Time of forecast')
     t = Column(Float, comment='dry bulb temperature at ground in degrees C')
@@ -262,20 +261,10 @@ class ForecastData(Base, Entity):
             'qlw3': self.qlw3
         }
 
-    def to_insert(self):
-        query = "INSERT INTO " + self.__tablename__ + "(" + ",".join(['!' for i in range(1, len(self.to_dict().keys()))])
-        query += ") VALUES(" + ",".join(['?' for i in range(1, len(self.to_dict().keys()))]) + ");"
-        for key, value in self.to_dict().items():
-            if key != 'id':
-                query = query.replace("!", key, 1)
-                query = query.replace("?", quote(value), 1)
-        return query
-
 
 class HistoricalData(Base):
     __tablename__ = 'historical_data'
     id = Column(Integer, primary_key=True)
-    issuetime = Column(DateTime, nullable=False, comment='Issue time of forecast')
     date = Column(Date, nullable=False, comment='Day of forecast')
     time = Column(Time, nullable=False, comment='Time of forecast')
     t = Column(Float, comment='dry bulb temperature at ground in degrees C')

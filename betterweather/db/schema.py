@@ -1,6 +1,6 @@
 from sqlalchemy.orm.session import Session
 from sqlalchemy import exc
-DB_VERSION = 5
+DB_VERSION = 6
 
 
 def get_version():
@@ -61,7 +61,7 @@ def schema_update(db, db_user, force=False, verbose=False):
     if version != DB_VERSION:
         for i in range(version, DB_VERSION):
             if i == 1:
-                """ Migrating to DB Version 2"""
+                """Migrating to DB Version 2"""
                 queries.append({
                     'sql': """ALTER TABLE forecast_data ALTER COLUMN id DROP DEFAULT;""",
                     'params': None
@@ -79,7 +79,7 @@ def schema_update(db, db_user, force=False, verbose=False):
                     'params': None
                 })
             if i == 2:
-                """ Migrating to DB Version 3"""
+                """Migrating to DB Version 3"""
                 queries.append({
                     'sql': """ALTER TABLE forecast_data DROP COLUMN id;""",
                     'params': None
@@ -111,11 +111,13 @@ def schema_update(db, db_user, force=False, verbose=False):
                     'params': None
                 })
             if i == 3:
+                """Migrating to DB Version 4"""
                 queries.append({
                     'sql': """CREATE INDEX forecast_data_station_id_date ON forecast_data(station_id, date);""",
                     'params': None
                 })
             if i == 4:
+                """Migrating to DB Version 5"""
                 queries.append({
                     'sql': """CREATE TABLE historical_data (
     id SERIAL NOT NULL,
@@ -166,6 +168,24 @@ def schema_update(db, db_user, force=False, verbose=False):
 );""",
                     'params': None
 
+                })
+            if i == 5:
+                """Migrating to DB Version 6"""
+                queries.append({
+                    'sql': """ALTER TABLE forecast_data DROP issuetime;""",
+                    'params': None
+                })
+                queries.append({
+                    'sql': """ALTER TABLE forecast_data ALTER COLUMN id DROP DEFAULT;""",
+                    'params': None
+                })
+                queries.append({
+                    'sql': """DROP SEQUENCE forecast_data_id_seq;""",
+                    'params': None
+                })
+                queries.append({
+                    'sql': """ALTER TABLE historical_data DROP issuetime;""",
+                    'params': None
                 })
         queries.append({
             'sql': """UPDATE db_information SET version=:version WHERE name=:name;""",

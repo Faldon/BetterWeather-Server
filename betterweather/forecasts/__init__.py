@@ -34,7 +34,6 @@ def archive_forecast_data(verbose):
     try:
         db_session.execute("""INSERT INTO historical_data SELECT
         id,
-        issuetime,
         date,
         time,
         t,
@@ -122,7 +121,7 @@ def update_mosmix_kml(root_url, verbose):
                                                     args=(forecast_dates, partition, verbose, forecasts, stations))
             local_process.start()
 
-        forecast_inserts = []
+        forecast_upserts = []
         station_upserts = []
         while len(multiprocessing.active_children()) > 0:
             if not stations.empty():
@@ -134,14 +133,14 @@ def update_mosmix_kml(root_url, verbose):
                     pass
             try:
                 sql = forecasts.get(block=True, timeout=1)
-                forecast_inserts.append(sql)
+                forecast_upserts.append(sql)
                 forecasts.task_done()
             except Empty:
                 pass
         for upsert in station_upserts:
             db_session.execute(upsert)
-        for insert in forecast_inserts:
-            db_session.execute(insert)
+        for upsert in forecast_upserts:
+            db_session.execute(upsert)
         db_session.execute("COMMIT;")
         db_session.flush()
         os.remove(file[0])
@@ -257,7 +256,6 @@ def __process_kml(dates, placemarks, verbose, forecast_results, station_results)
     result = False
     with betterweather.app.app_context():
         try:
-            issuetime = datetime.now()
             for placemark in placemarks:
                 station_id = placemark.find('./kml:name', KML_NS).text
                 station_name = placemark.find('./kml:description', KML_NS).text
@@ -282,11 +280,19 @@ def __process_kml(dates, placemarks, verbose, forecast_results, station_results)
                         '{https://opendata.dwd.de/weather/lib/pointforecast_dwd_extension_V1_0.xsd}elementName')
                     values[key] = data.find('./dwd:value', KML_NS).text.split()
                 for i in range(0, len(dates)):
+                    forecast_id = ""
+                    for char in station_id:
+                        if char.isdigit():
+                            forecast_id += char
+                        else:
+                            forecast_id += str(ord(char))
+                    forecast_id += dates[i].date()
+                    forecast_id += dates[i].time()
                     dp = ForecastData()
+                    dp.id = int(forecast_id)
                     dp.date = dates[i].date()
                     dp.time = dates[i].time()
                     dp.station_id = station_id
-                    dp.issuetime = issuetime
                     dp.tt = float(values['TTT'][i]) - 273.15 if values.get('TTT', {i: '-'})[i] != '-' else None
                     dp.tg = float(values['T5cm'][i]) - 273.15 if values.get('T5cm', {i: '-'})[i] != '-' else None
                     dp.td = float(values['Td'][i]) - 273.15 if values.get('Td', {i: '-'})[i] != '-' else None
@@ -316,7 +322,7 @@ def __process_kml(dates, placemarks, verbose, forecast_results, station_results)
                     dp.rrp6 = int(float(values['R602'][i])) if values.get('R602', {i: '-'})[i] != '-' else None
                     dp.rrp12 = int(float(values['Rh00'][i])) if values.get('Rh00', {i: '-'})[i] != '-' else None
                     dp.rrp24 = int(float(values['Rd02'][i])) if values.get('Rd02', {i: '-'})[i] != '-' else None
-                    forecast_results.put(dp.to_insert())
+                    forecast_results.put(dp.to_upsert())
                     if verbose:
                         print('Added forecast for station ' + dp.station_id, end='')
                         print(' on ' + dp.date.__str__() + ' ' + dp.time.__str__())
