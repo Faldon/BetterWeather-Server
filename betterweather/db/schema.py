@@ -1,6 +1,6 @@
 from sqlalchemy.orm.session import Session
 from sqlalchemy import exc
-DB_VERSION = 6
+DB_VERSION = 7
 
 
 def get_version():
@@ -185,6 +185,16 @@ def schema_update(db, db_user, force=False, verbose=False):
                 })
                 queries.append({
                     'sql': """ALTER TABLE historical_data DROP issuetime;""",
+                    'params': None
+                })
+            if i == 6:
+                """Migrating to DB Version 7"""
+                queries.append({
+                    'sql': """ALTER TABLE forecast_data ALTER COLUMN id type BIGINT;""",
+                    'params': None
+                })
+                queries.append({
+                    'sql': """ALTER TABLE historical_data ALTER COLUMN id type BIGINT;""",
                     'params': None
                 })
         queries.append({

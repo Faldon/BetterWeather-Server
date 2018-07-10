@@ -110,7 +110,7 @@ class WeatherStation(Base, Entity):
 
 class ForecastData(Base, Entity):
     __tablename__ = 'forecast_data'
-    id = Column(Integer, primary_key=True, autoincrement=False)
+    id = Column(BigInteger, primary_key=True, autoincrement=False)
     date = Column(Date, nullable=False, comment='Day of forecast')
     time = Column(Time, nullable=False, comment='Time of forecast')
     t = Column(Float, comment='dry bulb temperature at ground in degrees C')
@@ -262,7 +262,7 @@ class ForecastData(Base, Entity):
 
 class HistoricalData(Base):
     __tablename__ = 'historical_data'
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     date = Column(Date, nullable=False, comment='Day of forecast')
     time = Column(Time, nullable=False, comment='Time of forecast')
     t = Column(Float, comment='dry bulb temperature at ground in degrees C')
