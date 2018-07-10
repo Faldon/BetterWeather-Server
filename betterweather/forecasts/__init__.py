@@ -184,7 +184,7 @@ def get_forecast(db, station_id, timestamp, full):
             ForecastData.date == d.date(),
             ForecastData.time > d.time()
         ).order_by(
-            ForecastData.time.asc(),
+            ForecastData.time.asc()
         ).limit(1).first()
         lesser = db.query(ForecastData).options(
             joinedload(ForecastData.station, innerjoin=True)
@@ -201,8 +201,7 @@ def get_forecast(db, station_id, timestamp, full):
             ForecastData.date == d.date(),
             ForecastData.time > d.time()
         ).order_by(
-            ForecastData.time.asc(),
-            ForecastData.issuetime.desc()
+            ForecastData.time.asc()
         ).limit(1).first()
         lesser = db.query(ForecastData).filter(
             ForecastData.station_id == station_id,
