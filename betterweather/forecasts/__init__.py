@@ -194,8 +194,7 @@ def get_forecast(db, station_id, timestamp, full):
             ForecastData.date == d.date(),
             ForecastData.time <= d.time()
         ).order_by(
-            ForecastData.time.desc(),
-            ForecastData.issuetime.desc()
+            ForecastData.time.desc()
         ).limit(1).first()
     else:
         greater = db.query(ForecastData).filter(
@@ -211,8 +210,7 @@ def get_forecast(db, station_id, timestamp, full):
             ForecastData.date == d.date(),
             ForecastData.time <= d.time()
         ).order_by(
-            ForecastData.time.desc(),
-            ForecastData.issuetime.desc()
+            ForecastData.time.desc()
         ).limit(1).first()
 
     if greater is None and lesser is not None:
@@ -286,8 +284,8 @@ def __process_kml(dates, placemarks, verbose, forecast_results, station_results)
                             forecast_id += char
                         else:
                             forecast_id += str(ord(char))
-                    forecast_id += dates[i].date()
-                    forecast_id += dates[i].time()
+                    forecast_id += dates[i].date().__str__().replace("-", "")
+                    forecast_id += dates[i].time().__str__().replace(":", "")
                     dp = ForecastData()
                     dp.id = int(forecast_id)
                     dp.date = dates[i].date()
