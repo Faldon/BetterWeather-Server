@@ -185,7 +185,6 @@ def get_forecast(db, station_id, timestamp, full):
             ForecastData.time > d.time()
         ).order_by(
             ForecastData.time.asc(),
-            ForecastData.issuetime.desc()
         ).limit(1).first()
         lesser = db.query(ForecastData).options(
             joinedload(ForecastData.station, innerjoin=True)
@@ -284,8 +283,8 @@ def __process_kml(dates, placemarks, verbose, forecast_results, station_results)
                             forecast_id += char
                         else:
                             forecast_id += str(ord(char))
-                    forecast_id += dates[i].date().__str__().replace("-", "")
-                    forecast_id += dates[i].time().__str__().replace(":", "")
+                    forecast_id += dates[i].date().__format__("%Y%m%d")
+                    forecast_id += dates[i].time().__format__("%H%M")
                     dp = ForecastData()
                     dp.id = int(forecast_id)
                     dp.date = dates[i].date()
