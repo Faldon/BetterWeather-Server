@@ -1,7 +1,3 @@
-from betterweather.models import WeatherCode
-from sqlalchemy.orm.session import Session
-
-
 def get_weathercode(db, key_number):
     """
     Get weather code indormation
@@ -10,4 +6,4 @@ def get_weathercode(db, key_number):
     :return: Weather code information
     :rtype: WeatherCode or None
     """
-    return db.query(WeatherCode).get(key_number)
+    #return db.query(WeatherCode).get(key_number)
