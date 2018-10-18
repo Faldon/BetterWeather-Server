@@ -1,9 +1,9 @@
 import os
 import socket
 import click
-from flask import Flask, g, jsonify, request, render_template
+from flask import Flask, jsonify, render_template
 from datetime import datetime
-from betterweather import stations, codes, forecasts
+from betterweather import stations, forecasts
 
 
 app = Flask(__name__)
@@ -20,7 +20,7 @@ if __name__ == "__main__":
 def weatherstation_info_command(station_id):
     """Get weather station info for given id"""
     station = stations.get_station(app.config['STATIONS_URL'], station_id)
-    print(station if not station else station.to_json())
+    print(station)
 
 
 @app.cli.command('weatherstation_nearest')
@@ -28,14 +28,13 @@ def weatherstation_info_command(station_id):
 @click.argument('longitude')
 def weatherstation_nearest_command(latitude, longitude):
     """Get nearest weather station for geolocation"""
-    print(stations.get_nearest_station(latitude, longitude).to_json())
+    print(stations.get_nearest_station(app.config['STATIONS_URL'], latitude, longitude))
 
 
 @app.cli.command('forecastdata_print')
 @click.argument('station_id')
 @click.option('--forecast_date', help='The time for the forecast formatted %Y-%m-%d %H:%M [default=now]')
-@click.option('--full', is_flag=True, help='Also print station information')
-def forecastdata_print_command(station_id, forecast_date, full):
+def forecastdata_print_command(station_id, forecast_date):
     """Print forecast data for weather station"""
     try:
         t = datetime.strptime(forecast_date, '%Y-%m-%d %H:%M').timestamp()
@@ -44,16 +43,15 @@ def forecastdata_print_command(station_id, forecast_date, full):
     except TypeError:
         t = datetime.now().timestamp()
 
-    forecast = forecasts.get_forecast(None, station_id, t, full)
-    print(forecast if not forecast else forecast.to_json(full))
+    forecast = forecasts.get_forecast(app.config['FORECASTS_URL'], app.config['DEFINITION_URL'], station_id, t)
+    print(forecast)
 
 
 @app.cli.command('weathercode_print')
 @click.argument('key_number')
 def weathercode_print_command(key_number):
     """Print weather code information"""
-    weathercode = codes.get_weathercode(None, key_number)
-    print(weathercode if not weathercode else weathercode.to_json())
+    print(forecasts.get_present_weather(key_number))
 
 
 @app.cli.command('config_apache')
@@ -93,33 +91,32 @@ def config_apache_command(server_name):
 @app.route('/forecast/station/<station_id>/', defaults={'timestamp': datetime.now().timestamp()})
 @app.route('/forecast/station/<station_id>/<int:timestamp>')
 def get_forecast_by_station(station_id, timestamp):
-    full = request.args.get('full', default=False)
-    forecast = forecasts.get_forecast(None, station_id, timestamp, full)
-    return jsonify(forecast) if not forecast else jsonify(forecast.to_dict(full))
+    forecast = forecasts.get_forecast(app.config['FORECASTS_URL'], app.config['DEFINITION_URL'], station_id, timestamp)
+    forecast['date']['value'] = forecast['date']['value'].isoformat()
+    forecast['time']['value'] = forecast['time']['value'].isoformat()
+    return jsonify(forecast)
 
 
 @app.route('/forecast/location/<float:latitude>/<float:longitude>/', defaults={'timestamp': datetime.now().timestamp()})
 @app.route('/forecast/location/<float:latitude>/<float:longitude>/<int:timestamp>')
 def get_forecast_by_location(latitude, longitude, timestamp):
-    station = stations.get_nearest_station(None, latitude, longitude)
-    return get_forecast_by_station(station.id, timestamp)
+    station = stations.get_nearest_station(app.config['STATIONS_URL'], latitude, longitude)
+    return get_forecast_by_station(station.get('id'), timestamp) if station else jsonify(station)
 
 
 @app.route('/station/location/<float:latitude>/<float:longitude>')
 def get_station_by_location(latitude, longitude):
-    return jsonify(stations.get_nearest_station(None, latitude, longitude).to_dict())
+    return jsonify(stations.get_nearest_station(app.config['STATIONS_URL'], latitude, longitude))
 
 
 @app.route('/station/<station_id>')
 def get_station_by_id(station_id):
-    station = stations.get_station(station_id)
-    return jsonify(station) if not station else jsonify(station.to_dict())
+    return jsonify(stations.get_station(app.config['STATIONS_URL'], station_id))
 
 
 @app.route('/codes/weathercode/<int:key_number>')
 def get_weathercode_by_id(key_number):
-    weathercode = codes.get_weathercode(None, key_number)
-    return jsonify(weathercode) if not weathercode else jsonify(weathercode.to_dict())
+    return jsonify(forecasts.get_present_weather(key_number))
 
 
 @app.route('/')
