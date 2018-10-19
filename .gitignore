@@ -3,6 +3,8 @@ BetterWeather.egg-info/
 tests/testdata/test.db
 __pycache__
 betterweather/production.py
+build/
+dist/
 
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
@@ -12,6 +14,7 @@ betterweather/production.py
 .idea/**/tasks.xml
 .idea/dictionaries
 .idea/**/dbnavigator.xml
+.idea/**/*.iml
 
 # Sensitive or high-churn files:
 .idea/**/dataSources/
