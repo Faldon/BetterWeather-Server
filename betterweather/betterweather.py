@@ -51,7 +51,7 @@ def forecastdata_print_command(station_id, forecast_date):
 @click.argument('key_number')
 def weathercode_print_command(key_number):
     """Print weather code information"""
-    print(forecasts.get_present_weather(key_number))
+    print(forecasts.get_present_weather(int(key_number)))
 
 
 @app.cli.command('config_apache')
@@ -92,8 +92,9 @@ def config_apache_command(server_name):
 @app.route('/forecast/station/<station_id>/<int:timestamp>')
 def get_forecast_by_station(station_id, timestamp):
     forecast = forecasts.get_forecast(app.config['FORECASTS_URL'], app.config['DEFINITION_URL'], station_id, timestamp)
-    forecast['date']['value'] = forecast['date']['value'].isoformat()
-    forecast['time']['value'] = forecast['time']['value'].isoformat()
+    if forecast:
+        forecast['date']['value'] = forecast['date']['value'].isoformat()
+        forecast['time']['value'] = forecast['time']['value'].isoformat()
     return jsonify(forecast)
 
 

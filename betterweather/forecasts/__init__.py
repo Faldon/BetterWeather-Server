@@ -25,24 +25,102 @@ def get_forecast(source, definition, station_id, timestamp):
     :rtype dict or bool
     """
     d = datetime.fromtimestamp(timestamp)
-    url = os.path.join(source, station_id, 'kml/MOSMIX_L_LATEST_' + station_id + '.kmz')
+    try:
+        remote_files = __get_remote_files(source, definition, station_id)
+        if remote_files:
+            zip_handle = zipfile.ZipFile(remote_files[0])
+            file_name = zip_handle.filelist[0].filename
+            zip_handle.extractall(path='/tmp/')
+
+            kml_root = ElementTree.parse('/tmp/' + file_name)
+            def_root = ElementTree.parse(remote_files[1])
+
+            forecasts = __process_kml(kml_root, def_root)
+            s = sorted(
+                forecasts,
+                key=lambda k: abs(datetime.combine(k['date']['value'], k['time']['value']).timestamp() - d.timestamp())
+            )
+            os.unlink(remote_files[0])
+            os.unlink(remote_files[1])
+            os.unlink('/tmp/' + file_name)
+            return s[0]
+        return False
+    except IOError as err_io:
+        print('IO Error while processing forecast data: ' + err_io.__str__())
+        return False
+
+
+def get_daily_trend(source, definition, station_id, date):
+    d = datetime.strptime(date, '%Y-%m-%d')
+    try:
+        remote_files = __get_remote_files(source, definition, station_id)
+        if remote_files:
+            zip_handle = zipfile.ZipFile(remote_files[0])
+            file_name = zip_handle.filelist[0].filename
+            zip_handle.extractall(path='/tmp/')
+
+            kml_root = ElementTree.parse('/tmp/' + file_name)
+            def_root = ElementTree.parse(remote_files[1])
+
+            forecasts = __process_kml(kml_root, def_root)
+            f = filter(
+                lambda k: k['date']['value'] == d.date(),
+                forecasts
+
+            )
+            os.unlink(remote_files[0])
+            os.unlink(remote_files[1])
+            os.unlink('/tmp/' + file_name)
+            return list(f)
+        return False
+    except IOError as err_io:
+        print('IO Error while processing forecast data: ' + err_io.__str__())
+        return False
+
+
+def get_weekly_trend(source, definition, station_id):
+    try:
+        remote_files = __get_remote_files(source, definition, station_id)
+        if remote_files:
+            zip_handle = zipfile.ZipFile(remote_files[0])
+            file_name = zip_handle.filelist[0].filename
+            zip_handle.extractall(path='/tmp/')
+
+            kml_root = ElementTree.parse('/tmp/' + file_name)
+            def_root = ElementTree.parse(remote_files[1])
+
+            forecasts = __process_kml(kml_root, def_root)
+
+            os.unlink(remote_files[0])
+            os.unlink(remote_files[1])
+            os.unlink('/tmp/' + file_name)
+            return forecasts
+        return False
+    except IOError as err_io:
+        print('IO Error while processing forecast data: ' + err_io.__str__())
+        return False
+
+
+def get_present_weather(code):
+    return __get_all_weathercodes().get(code, "")
+
+
+def __get_remote_files(kml, definition, station_id):
+    """Get files for the weather forecast from external source
+
+        Download the kmz and the dwd element definiton xml from the dwd server
+        :param str kml: The link to the kmz file of the requested station
+        :param str definition: The link to the MetElementDefinition xml file
+        :param str station_id: The station id
+        :return The path to the downloaded files or False on error
+        :rtype tuple or bool
+        """
+    url = os.path.join(kml, station_id, 'kml/MOSMIX_L_LATEST_' + station_id + '.kmz')
     try:
         mosmix_file = request.urlretrieve(url)
-        zip_handle = zipfile.ZipFile(mosmix_file[0])
-        file_name = zip_handle.filelist[0].filename
-        zip_handle.extractall(path='/tmp/')
-        kml_root = ElementTree.parse('/tmp/' + file_name)
-
         definition_file = request.urlretrieve(definition)
-        def_root = ElementTree.parse(definition_file[0])
 
-        forecasts = __process_kml(kml_root, def_root)
-        s = sorted(
-            forecasts,
-            key=lambda k: abs(datetime.combine(k['date']['value'], k['time']['value']).timestamp() - d.timestamp())
-        )
-        return s[0]
-
+        return mosmix_file[0], definition_file[0]
     except error.HTTPError as err_http:
         print('HTTP Error while retrieving forecast data: ' + err_http.__str__())
         return False
@@ -52,10 +130,6 @@ def get_forecast(source, definition, station_id, timestamp):
     except error.ContentTooShortError as err_content_to_short:
         print("Download of " + url + 'failed: ' + err_content_to_short.__str__())
         return False
-
-
-def get_present_weather(code):
-    return __get_all_weathercodes().get(code, "")
 
 
 def __get_all_weathercodes():
