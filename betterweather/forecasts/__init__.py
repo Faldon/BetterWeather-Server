@@ -3,6 +3,7 @@ import zipfile
 from datetime import datetime
 from urllib import request, error
 from xml.etree import cElementTree as ElementTree
+from betterweather import settings
 
 KML_NS = {
     'kml': "http://www.opengis.net/kml/2.2",
@@ -13,12 +14,10 @@ KML_NS = {
 }
 
 
-def get_forecast(source, definition, station_id, timestamp):
+def get_forecast(station_id, timestamp):
     """Get weather forecast
 
     Lookup the closest weather forecast of given station for the given time
-    :param str source: The link to the directory containing the file
-    :param str definition: The link to the MetElementDefinition xml file
     :param str station_id: The station id
     :param float timestamp: The time for the forecast as timestamp
     :return A weather forecast or False on error
@@ -26,7 +25,7 @@ def get_forecast(source, definition, station_id, timestamp):
     """
     d = datetime.fromtimestamp(timestamp)
     try:
-        remote_files = __get_remote_files(source, definition, station_id)
+        remote_files = __get_remote_files(station_id)
         if remote_files:
             zip_handle = zipfile.ZipFile(remote_files[0])
             file_name = zip_handle.filelist[0].filename
@@ -50,10 +49,10 @@ def get_forecast(source, definition, station_id, timestamp):
         return False
 
 
-def get_daily_trend(source, definition, station_id, date):
+def get_daily_trend(station_id, date):
     d = datetime.strptime(date, '%Y-%m-%d')
     try:
-        remote_files = __get_remote_files(source, definition, station_id)
+        remote_files = __get_remote_files(station_id)
         if remote_files:
             zip_handle = zipfile.ZipFile(remote_files[0])
             file_name = zip_handle.filelist[0].filename
@@ -78,9 +77,9 @@ def get_daily_trend(source, definition, station_id, date):
         return False
 
 
-def get_weekly_trend(source, definition, station_id):
+def get_weekly_trend(station_id):
     try:
-        remote_files = __get_remote_files(source, definition, station_id)
+        remote_files = __get_remote_files(station_id)
         if remote_files:
             zip_handle = zipfile.ZipFile(remote_files[0])
             file_name = zip_handle.filelist[0].filename
@@ -105,20 +104,18 @@ def get_present_weather(code):
     return __get_all_weathercodes().get(code, "")
 
 
-def __get_remote_files(kml, definition, station_id):
+def __get_remote_files(station_id):
     """Get files for the weather forecast from external source
 
         Download the kmz and the dwd element definiton xml from the dwd server
-        :param str kml: The link to the kmz file of the requested station
-        :param str definition: The link to the MetElementDefinition xml file
         :param str station_id: The station id
         :return The path to the downloaded files or False on error
         :rtype tuple or bool
         """
-    url = os.path.join(kml, station_id, 'kml/MOSMIX_L_LATEST_' + station_id + '.kmz')
+    url = os.path.join(settings.FORECASTS_URL, station_id, 'kml/MOSMIX_L_LATEST_' + station_id + '.kmz')
     try:
         mosmix_file = request.urlretrieve(url)
-        definition_file = request.urlretrieve(definition)
+        definition_file = request.urlretrieve(settings.DEFINITION_URL)
 
         return mosmix_file[0], definition_file[0]
     except error.HTTPError as err_http:

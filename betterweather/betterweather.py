@@ -19,7 +19,7 @@ if __name__ == "__main__":
 @click.argument('station_id')
 def weatherstation_info_command(station_id):
     """Get weather station info for given id"""
-    station = stations.get_station(app.config['STATIONS_URL'], station_id)
+    station = stations.get_station(station_id)
     print(station)
 
 
@@ -28,7 +28,7 @@ def weatherstation_info_command(station_id):
 @click.argument('longitude')
 def weatherstation_nearest_command(latitude, longitude):
     """Get nearest weather station for geolocation"""
-    print(stations.get_nearest_station(app.config['STATIONS_URL'], latitude, longitude))
+    print(stations.get_nearest_station(latitude, longitude))
 
 
 @app.cli.command('forecastdata_print')
@@ -43,7 +43,7 @@ def forecastdata_print_command(station_id, forecast_date):
     except TypeError:
         t = datetime.now().timestamp()
 
-    forecast = forecasts.get_forecast(app.config['FORECASTS_URL'], app.config['DEFINITION_URL'], station_id, t)
+    forecast = forecasts.get_forecast(station_id, t)
     print(forecast)
 
 
@@ -91,7 +91,7 @@ def config_apache_command(server_name):
 @app.route('/forecast/station/<station_id>/', defaults={'timestamp': datetime.now().timestamp()})
 @app.route('/forecast/station/<station_id>/<int:timestamp>')
 def get_forecast_by_station(station_id, timestamp):
-    forecast = forecasts.get_forecast(app.config['FORECASTS_URL'], app.config['DEFINITION_URL'], station_id, timestamp)
+    forecast = forecasts.get_forecast(station_id, timestamp)
     if forecast:
         forecast['date']['value'] = forecast['date']['value'].isoformat()
         forecast['time']['value'] = forecast['time']['value'].isoformat()
@@ -101,18 +101,18 @@ def get_forecast_by_station(station_id, timestamp):
 @app.route('/forecast/location/<float:latitude>/<float:longitude>/', defaults={'timestamp': datetime.now().timestamp()})
 @app.route('/forecast/location/<float:latitude>/<float:longitude>/<int:timestamp>')
 def get_forecast_by_location(latitude, longitude, timestamp):
-    station = stations.get_nearest_station(app.config['STATIONS_URL'], latitude, longitude)
+    station = stations.get_nearest_station(latitude, longitude)
     return get_forecast_by_station(station.get('id'), timestamp) if station else jsonify(station)
 
 
 @app.route('/station/location/<float:latitude>/<float:longitude>')
 def get_station_by_location(latitude, longitude):
-    return jsonify(stations.get_nearest_station(app.config['STATIONS_URL'], latitude, longitude))
+    return jsonify(stations.get_nearest_station(latitude, longitude))
 
 
 @app.route('/station/<station_id>')
 def get_station_by_id(station_id):
-    return jsonify(stations.get_station(app.config['STATIONS_URL'], station_id))
+    return jsonify(stations.get_station(station_id))
 
 
 @app.route('/codes/weathercode/<int:key_number>')

@@ -1,10 +1,11 @@
 from math import sin, cos, sqrt, atan2, radians
 from urllib import request, error
+from betterweather import settings
 
 R = 6373.0
 
 
-def get_station(source, station_id):
+def get_station(station_id):
     """Get weather station information
 
     :param str source: The URI of the weather station source information
@@ -12,23 +13,22 @@ def get_station(source, station_id):
     :return: Weather station information or False on error
     :rtype: dict or bool
     """
-    stations = __get_all_stations(source)
+    stations = __get_all_stations()
     if stations:
         return next(filter(lambda station: station.get('id').lower() == station_id.lower(), stations), {})
     return False
 
 
-def get_nearest_station(source, latitude, longitude):
+def get_nearest_station(latitude, longitude):
     """Get nearest weather station information to target poi
 
-    :param str source: The URI of the weather station source information
     :param float latitude: The latitude of target poi
     :param float longitude: The longitude of target poi
     :return: Weather station information or False on error
     :rtype: dict or bool
     """
     src = dict(latitude=latitude, longitude=longitude)
-    stations = __get_all_stations(source)
+    stations = __get_all_stations()
     if stations:
         distances = []
         for station in stations:
@@ -39,16 +39,15 @@ def get_nearest_station(source, latitude, longitude):
     return False
 
 
-def __get_all_stations(source):
+def __get_all_stations():
     """Get all available weather stations
 
-    :param str source: The URI of the weather station source file
     :return: List of weather station information or False on error
     :rtype: list[dict] or bool
     """
     all_stations = list()
     try:
-        file = request.urlretrieve(source)
+        file = request.urlretrieve(settings.STATIONS_URL)
         with open(file[0], 'rb') as station_list:
             for line in station_list.readlines():
                 line = line.decode('latin-1')
@@ -72,7 +71,7 @@ def __get_all_stations(source):
         print('IO Error while retrieving station data: ' + err_io.__str__())
         return False
     except error.ContentTooShortError as err_content_to_short:
-        print("Download of " + source + 'failed: ' + err_content_to_short.__str__())
+        print("Download of " + settings.STATIONS_URL + 'failed: ' + err_content_to_short.__str__())
         return False
 
 
