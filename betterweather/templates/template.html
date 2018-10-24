@@ -2,18 +2,21 @@
 <html>
     <head>
         <title>Better Weather</title>
-        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/lib/bootstrap.min.css') }}">
-        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/lib/typeaheadjs.css') }}">
+        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/weather-icons.min.css') }}">
+        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/weather-icons-wind.min.css') }}">
+        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/typeaheadjs.css') }}">
+        <link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/site.css') }}">
     </head>
     <body>
-        <div class="container-fluid">
+        <div class="container">
             {% block content %}{% endblock %}
         </div>
     </body>
-    <script src="{{ url_for('static', filename='js/lib/jquery-3.3.1.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/typeahead.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/typeahead-address-photon.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/jquery-3.3.1.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/typeahead.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/typeahead-address-photon.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/utilities.js') }}"></script>
     {% block javascript %}{% endblock %}
 </html>

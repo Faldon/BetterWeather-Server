@@ -123,3 +123,13 @@ def get_weathercode_by_id(key_number):
 @app.route('/')
 def show_index():
     return render_template('index.html')
+
+
+@app.route('/daily')
+def show_daily_trend():
+    return render_template('daily.html')
+
+
+@app.route('/weekly')
+def show_weekly_trend():
+    return render_template('weekly.html')

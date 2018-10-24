@@ -1,15 +1,15 @@
 function toCelsius(temperature) {
-    return temperature - 273.15;
+    return Math.round(temperature - 273.15);
 }
 
 function toFahrenheit(temperature) {
-    return temperature * 9/5 - 459.67;
+    return Math.round(temperature * 9/5 - 459.67);
 }
 
 function toKmph(mps) {
-    return mps * 3.6;
+    return Math.round(mps * 3.6);
 }
 
 function toMph(mps) {
-    return mps * 2.2367;
+    return Math.round(mps * 2.2367);
 }
