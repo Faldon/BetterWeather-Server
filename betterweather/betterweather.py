@@ -1,7 +1,7 @@
 import os
 import socket
 import click
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from datetime import datetime
 from betterweather import stations, forecasts
 
@@ -84,6 +84,12 @@ def config_apache_command(server_name):
         <IfVersion >= 2.4>
             Require all granted
         </IfVersion>
+        
+        <IfModule mod_headers.c>
+            Header set Cache-Control "no-cache, no-store, must-revalidate"
+            Header set Pragma "no-cache"
+            Header set Expires 0
+        </IfModule>
     </Directory>
 </VirtualHost>""")
 
@@ -92,9 +98,12 @@ def config_apache_command(server_name):
 @app.route('/forecast/station/<station_id>/<int:timestamp>')
 def get_forecast_by_station(station_id, timestamp):
     forecast = forecasts.get_forecast(station_id, timestamp)
+    station = stations.get_station(station_id)
     if forecast:
         forecast['date']['value'] = forecast['date']['value'].isoformat()
         forecast['time']['value'] = forecast['time']['value'].isoformat()
+        forecast['station'] = station
+        forecast['present_weather'] = forecasts.get_present_weather(forecast.get('ww').get('value'))
     return jsonify(forecast)
 
 
@@ -120,9 +129,10 @@ def get_weathercode_by_id(key_number):
     return jsonify(forecasts.get_present_weather(key_number))
 
 
-@app.route('/')
-def show_index():
-    return render_template('index.html')
+@app.route('/', defaults={'station_id': None})
+@app.route('/<station_id>')
+def show_index(station_id):
+    return render_template('index.html', station=station_id)
 
 
 @app.route('/daily')

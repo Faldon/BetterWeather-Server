@@ -10,7 +10,7 @@
                 <input id="bw_latitude" type="hidden">
                 <label class="sr-only" for="bw_location">Location</label>
                 <div class="col-md-8">
-                    <input type="text" class="form-control mb-2 mr-sm-2" id="bw_location">
+                    <input type="text" class="form-control mb-2 mr-sm-2" id="bw_location" autocomplete="off">
                 </div>
                 <div class="col-md-1">
                     <button type="submit" class="btn btn-outline-info pb-2">Submit</button>
@@ -21,11 +21,11 @@
 </div>
 <div class="triple-spinner mx-auto" style="display: none"></div>
 <div id="forecast" class="card border-dark mx-auto mt-2" style="width: 29rem; display: none">
-    <div class="card-header text-center">Current weather</div>
+    <div id="forecast_header" class="card-header text-center">Current weather</div>
     <div class="card-body">
-        <h3 id="temperature" class="mx-3 text-muted d-inline" style="text-transform: none !important"></h3>
-        <h3 id="precipitation" class="mx-3 text-muted d-inline" style="text-transform: none !important"></h3>
-        <h3 id="windspeed" class="mx-3 text-muted d-inline" style="text-transform: none !important"></h3>
+        <h3 id="temperature" class="mx-4 text-muted d-inline" style="text-transform: none !important"></h3>
+        <h3 id="precipitation" class="mx-4 text-muted d-inline" style="text-transform: none !important"></h3>
+        <h3 id="windspeed" class="mx-4 text-muted d-inline" style="text-transform: none !important"></h3>
     </div>
 
 </div>
@@ -56,28 +56,11 @@
             event.preventDefault();
             $('#forecast').hide();
             $('.triple-spinner').show();
-            $.ajax({
-                url: 'forecast/location/' + $('#bw_latitude').val() + '/' + $('#bw_longitude').val() + '/',
-                method: 'GET'
-            }).done(function(data, textStatus, jqXHR) {
-                $('#temperature').prop('innerHTML', '<b>' + toCelsius(data.ttt.value) + '</b> °C');
-
-                if(data.wwf.value >= data.wws.value) {
-                    $('#precipitation').prop('innerHTML', '<i id="precipation_type" class="wi wi-raindrops"></i>');
-                } else {
-                    $('#precipitation').prop('innerHTML', '<i id="precipation_type" class="wi wi-snow"></i>');
-                }
-                $('#precipation_type').after('<b>' + data.wwp.value + '</b> %');
-
-                $('#windspeed').prop('innerHTML', '<i id="wind_direction" class="wi wi-wind towards-' + data.dd.value + '-deg"></i> <b>' + toKmph(data.ff.value) + '</b> Km/h');
-                $('.triple-spinner').hide();
-                $('#forecast').show();
-                console.dir(data);
-            }).fail(function(jqXHR, textStatus, errorThrown) {
-                $('.triple-spinner').hide();
-                console.log(errorThrown);
-            });
+            showForecast('forecast/location/' + $('#bw_latitude').val() + '/' + $('#bw_longitude').val() + '/');
         });
+        {% if station %}
+        showForecast('forecast/station/{{ station }}/');
+        {% endif %}
     });
 </script>
 {% endblock %}

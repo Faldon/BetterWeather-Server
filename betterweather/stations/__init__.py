@@ -8,7 +8,6 @@ R = 6373.0
 def get_station(station_id):
     """Get weather station information
 
-    :param str source: The URI of the weather station source information
     :param str station_id: The station id
     :return: Weather station information or False on error
     :rtype: dict or bool
