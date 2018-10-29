@@ -1,7 +1,7 @@
 import os
 import socket
 import click
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template
 from datetime import datetime
 from betterweather import stations, forecasts
 
@@ -135,11 +135,13 @@ def show_index(station_id):
     return render_template('index.html', station=station_id)
 
 
-@app.route('/daily')
-def show_daily_trend():
-    return render_template('daily.html')
+@app.route('/daily', defaults={'station_id': None})
+@app.route('/daily/<station_id>')
+def show_daily_trend(station_id):
+    return render_template('daily.html', station=station_id)
 
 
-@app.route('/weekly')
-def show_weekly_trend():
-    return render_template('weekly.html')
+@app.route('/weekly', defaults={'station_id': None})
+@app.route('/weekly/<station_id>')
+def show_weekly_trend(station_id):
+    return render_template('weekly.html', station=station_id)
