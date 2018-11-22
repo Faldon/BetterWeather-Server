@@ -51,13 +51,15 @@ def __get_all_stations():
             for line in station_list.readlines():
                 line = line.decode('latin-1')
                 if len(line) >= 75 and line[12:12 + 5].strip() != 'id' and line[12:12 + 5] != '=====':
+                    lat = float(line[44:44 + 6].split('.')[0]) + float(line[44:44 + 6].split('.')[1]) / 60
+                    lon = float(line[51:51 + 7].split('.')[0]) + float(line[51:51 + 7].split('.')[1]) / 60
                     all_stations.append(
                         {
                             'id': line[12:12 + 5].strip(),
                             'ICAO': line[18:18 + 4] if line[18:18 + 4] != '----' else None,
                             'name': line[23:23 + 20].strip(),
-                            'latitude': float(line[44:44 + 6]),
-                            'longitude': float(line[51:51 + 7]),
+                            'latitude': lat,
+                            'longitude': lon,
                             'altitude': int(line[59:59 + 5]),
                             'type': line[72:72 + 4]
                         }
