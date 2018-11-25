@@ -1,8 +1,8 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='BetterWeather',
-    packages=['betterweather'],
+    packages=find_packages(),
     version="1.0",
     include_package_data=True,
     zip_safe=False,
