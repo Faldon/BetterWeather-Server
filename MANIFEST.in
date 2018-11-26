@@ -1,2 +1,2 @@
-recursive-include yourapplication/templates *
-recursive-include yourapplication/static *
+recursive-include betterweather/templates *
+recursive-include betterweather/static *
