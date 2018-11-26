@@ -1,0 +1,7 @@
+flask>=0.12.2
+click>=6.7
+setuptools>=38.5.1
+pip>=9.0.1
+wheel>=0.30.0
+sphinx==1.7.6
+sphinx_rtd_theme==0.4.1
