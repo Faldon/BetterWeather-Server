@@ -19,21 +19,24 @@
         </form>
     </div>
 </div>
-<div class="triple-spinner mx-auto" style="display: none"></div>
-<div id="forecast" class="card border-dark mx-auto mt-2" style="width: 29rem; display: none">
-    <div id="forecast_header" class="card-header text-center">Current weather</div>
-    <div class="card-body">
-        <h3 id="temperature" class="mx-4 text-muted d-inline" style="text-transform: none !important"></h3>
-        <h3 id="precipitation" class="mx-4 text-muted d-inline" style="text-transform: none !important"></h3>
-        <h3 id="windspeed" class="mx-4 text-muted d-inline" style="text-transform: none !important"></h3>
-        <h5 id="present_weather" class="mx-auto text-muted mt-2"></h5>
+<div class="triple-spinner" style="display: none"></div>
+<div class="container">
+    <div id="forecast" class="card border-dark mx-auto mt-2">
+        <div id="forecast_header" class="card-header text-center"></div>
+        <div class="card-body">
+            <h3 id="bw-ttt-0" class="mx-4 text-muted d-inline no-transform"></h3>
+            <h3 id="bw-wwp-0" class="mx-4 text-muted d-inline no-transform"></h3>
+            <h3 id="bw-ff-0" class="mx-4 text-muted d-inline no-transform"></h3>
+            <h5 id="bw-present_weather-0" class="mx-auto text-muted mt-2"></h5>
+        </div>
     </div>
-
 </div>
+
 {% endblock %}
 {% block javascript %}
 <script type="text/javascript">
     $(document).ready(function() {
+        window.weather = new BetterWeather('forecast');
         var engine = new PhotonAddressEngine();
 
         $('#bw_location').typeahead({
@@ -55,12 +58,11 @@
 
         $('#bw').submit(function(event) {
             event.preventDefault();
-            $('#forecast').hide();
             $('.triple-spinner').show();
-            showForecast('forecast/location/' + $('#bw_latitude').val() + '/' + $('#bw_longitude').val() + '/');
+            weather.showForecast('forecast/location/' + $('#bw_latitude').val() + '/' + $('#bw_longitude').val() + '/');
         });
         {% if station %}
-        showForecast('forecast/station/{{ station }}/');
+        weather.showForecast('forecast/station/{{ station }}/');
         {% endif %}
     });
 </script>
