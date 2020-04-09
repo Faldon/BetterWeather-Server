@@ -1,3 +1,5 @@
+import ssl
+import tempfile
 from math import sin, cos, sqrt, atan2, radians
 from urllib import request, error
 from betterweather import settings
@@ -46,8 +48,11 @@ def __get_all_stations():
     """
     all_stations = list()
     try:
-        file = request.urlretrieve(settings.STATIONS_URL)
-        with open(file[0], 'rb') as station_list:
+        with tempfile.TemporaryFile() as station_list:
+            gcontext = ssl._create_unverified_context()
+            with request.urlopen(settings.STATIONS_URL, context=gcontext) as u:
+                station_list.write(u.read())
+            station_list.seek(0)
             for line in station_list.readlines():
                 line = line.decode('latin-1')
                 if len(line) >= 75 and line[12:12 + 5].strip() != 'id' and line[12:12 + 5] != '=====':

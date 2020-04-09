@@ -1,0 +1,8 @@
+DATABASE = dict(
+    DIALECT='postgres',
+    HOST='localhost',
+    PORT=None,
+    USER='betterweather',
+    PASS='betterweather',
+    NAME='betterweather'
+)

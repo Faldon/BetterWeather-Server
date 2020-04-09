@@ -1,5 +1,7 @@
 import os
 import zipfile
+import ssl
+import tempfile
 from datetime import datetime
 from urllib import request, error
 from xml.etree import cElementTree as ElementTree
@@ -114,10 +116,20 @@ def __get_remote_files(station_id):
         """
     url = os.path.join(settings.FORECASTS_URL, station_id, 'kml/MOSMIX_L_LATEST_' + station_id + '.kmz')
     try:
-        mosmix_file = request.urlretrieve(url)
-        definition_file = request.urlretrieve(settings.DEFINITION_URL)
+        temp_dir = tempfile.gettempdir()
+        gcontext = ssl._create_unverified_context()
+        mosmix_file = os.path.join(temp_dir, 'MOSMIX_L_LATEST_' + station_id + '.kmz')
+        with open(mosmix_file, 'wb') as mosmix:
+            with request.urlopen(url, context=gcontext) as u:
+                mosmix.write(u.read())
+            mosmix.seek(0)
+        definition_file = os.path.join(temp_dir, 'MetElementDefinition.xml')
+        with open(definition_file, 'wb') as definition:
+            with request.urlopen(settings.DEFINITION_URL, context=gcontext) as u:
+                definition.write(u.read())
+            definition.seek(0)
 
-        return mosmix_file[0], definition_file[0]
+        return mosmix_file, definition_file
     except error.HTTPError as err_http:
         print('HTTP Error while retrieving forecast data: ' + err_http.__str__())
         return False

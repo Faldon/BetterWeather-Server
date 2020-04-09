@@ -106,7 +106,6 @@
         console.log(req.statusText)
       } else {
         data = req.response
-        console.dir(data)
         if (is_table) {
           return
         } else if (is_panel) {
