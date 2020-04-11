@@ -133,7 +133,7 @@
                 : '<i id="precipation_type" class="wi wi-snow"></i>'
             }
             if (prop == 'ff') {
-              node.innerHTML += '<i id="wind_direction" class="wi wi-wind towards-' +
+              node.innerHTML += '<i id="wind_direction" class="wi wi-wind from-' +
                 data[i].dd.value + '-deg"></i>'
             }
           })
